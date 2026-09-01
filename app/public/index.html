@@ -1,0 +1,2226 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lilly - Digital Human</title>
+    <script src="https://cdn.uneeq.io/hosted-experience/deploy/index.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        display: flex;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      /* Sidebar Styles */
+      .sidebar {
+        width: 280px;
+        background: #f8f9fa;
+        border-right: 1px solid #dee2e6;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow-y: auto;
+      }
+
+      .sidebar-header {
+        padding: 1.5rem 1rem;
+        background: #fff;
+        border-bottom: 1px solid #dee2e6;
+      }
+
+      .sidebar-header h1 {
+        color: #d32f2f;
+        font-size: 1.5rem;
+        font-weight: bold;
+      }
+
+      .sidebar-nav {
+        flex: 1;
+        padding: 1rem 0;
+      }
+
+      .sidebar-nav ul {
+        list-style: none;
+      }
+
+      .sidebar-nav ul li {
+        margin: 0.25rem 0;
+      }
+
+      .sidebar-nav ul li a {
+        display: block;
+        padding: 0.75rem 1.5rem;
+        color: #333;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        border-left: 3px solid transparent;
+      }
+
+      .sidebar-nav ul li a:hover {
+        background: #e9ecef;
+        border-left-color: #d32f2f;
+      }
+
+      .sidebar-nav ul li a.active {
+        background: #e3f2fd;
+        border-left-color: #d32f2f;
+        color: #d32f2f;
+        font-weight: 600;
+      }
+
+      /* Accordion Styles */
+      .accordion-header {
+        padding: 0.75rem 1.5rem;
+        background: #fff;
+        border: none;
+        width: 100%;
+        text-align: left;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: #666;
+        font-size: 0.875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        transition: background 0.3s ease;
+      }
+
+      .accordion-header:hover {
+        background: #f8f9fa;
+      }
+
+      .accordion-icon {
+        color: #d32f2f;
+        font-size: 1.2rem;
+        font-weight: bold;
+        transition: transform 0.3s ease;
+      }
+
+      .accordion-content {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease;
+      }
+
+      .accordion-content.active {
+        max-height: 500px;
+      }
+
+      .sidebar-footer {
+        padding: 1.5rem 1rem;
+        background: #fff;
+        border-top: 1px solid #dee2e6;
+      }
+
+      .sidebar-footer h2 {
+        color: #d32f2f;
+        font-size: 1.25rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .sidebar-footer p {
+        color: #666;
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+      }
+
+      .sidebar-footer .btn {
+        display: block;
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.5rem;
+        text-align: center;
+        text-decoration: none;
+        border-radius: 4px;
+        transition: all 0.3s ease;
+      }
+
+      .sidebar-footer .btn-primary {
+        background: #d32f2f;
+        color: white;
+        border: none;
+      }
+
+      .sidebar-footer .btn-primary:hover {
+        background: #b71c1c;
+      }
+
+      .sidebar-footer .btn-secondary {
+        background: transparent;
+        color: #d32f2f;
+        border: 1px solid #d32f2f;
+      }
+
+      .sidebar-footer .btn-secondary:hover {
+        background: #fce4ec;
+      }
+
+      /* Main Content Styles */
+      .main-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .content-area {
+        flex: 1;
+        padding: 1.5rem 2.5rem;
+        overflow-y: auto;
+        max-width: 1200px;
+        margin: 0 auto;
+        width: 100%;
+      }
+
+      .content-area h1 {
+        color: #333;
+        margin-bottom: 1.5rem;
+      }
+
+      .digital-human-container {
+        margin-top: 2rem;
+      }
+
+      button {
+        background: #d32f2f;
+        color: white;
+        border: none;
+        padding: 1rem 2rem;
+        font-size: 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background 0.3s ease;
+      }
+
+      button:hover {
+        background: #b71c1c;
+      }
+
+      /* Loader Styles */
+      .loader-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+      }
+
+      .loader-overlay.active {
+        display: flex;
+      }
+
+      .loader-content {
+        text-align: center;
+        color: white;
+      }
+
+      .spinner {
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-top: 4px solid #d32f2f;
+        border-radius: 50%;
+        width: 80px;
+        height: 80px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1rem;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-weight: bold;
+        color: #d32f2f;
+        font-size: 0.9rem;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .spinner-text {
+        animation: spin-reverse 1s linear infinite;
+      }
+
+      @keyframes spin-reverse {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(-360deg);
+        }
+      }
+
+      /* Responsive Design */
+      @media (max-width: 768px) {
+        body {
+          flex-direction: column;
+        }
+
+        .sidebar {
+          width: 100%;
+          height: auto;
+          max-height: 50vh;
+        }
+      }
+
+      /* Corner Logo */
+      .corner-logo {
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        padding: 0.5rem 1rem;
+        background: rgba(255, 255, 255, 0.95);
+        border: 2px solid #d32f2f;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .corner-logo img {
+        height: 24px;
+      }
+
+      .corner-logo span {
+        color: #333;
+        font-size: 0.875rem;
+        font-weight: 600;
+      }
+
+      /* Avatar Control Icons */
+      .avatar-controls {
+        position: fixed;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 1rem;
+        z-index: 9999999 !important;
+      }
+
+      .control-btn {
+        min-width: 60px;
+        height: 60px;
+        border-radius: 12px;
+        background: rgba(211, 47, 47, 0.9);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+        transition: all 0.3s ease;
+        padding: 0.5rem;
+        gap: 0.25rem;
+        backdrop-filter: blur(10px);
+      }
+
+      .control-btn:hover {
+        background: rgba(183, 28, 28, 0.95);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+        border-color: rgba(255, 255, 255, 0.5);
+      }
+
+      .control-btn.muted {
+        background: rgba(102, 102, 102, 0.9);
+      }
+
+      .control-btn.muted:hover {
+        background: rgba(85, 85, 85, 0.95);
+      }
+
+      .control-btn .icon {
+        width: 28px;
+        height: 28px;
+        line-height: 1;
+        fill: white;
+      }
+
+      .control-btn svg.icon {
+        width: 28px;
+        height: 28px;
+        fill: white;
+      }
+
+      .control-btn .label {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        line-height: 1;
+        text-align: center;
+        letter-spacing: 0.5px;
+        margin-top: 2px;
+      }
+
+      .control-btn svg {
+        width: 24px;
+        height: 24px;
+        fill: white;
+      }
+
+      .control-btn svg path {
+        fill: white;
+      }
+
+      /* Show medication visual on larger screens */
+      @media (min-width: 768px) {
+        .medication-visual {
+          display: block !important;
+        }
+      }
+
+      /* Pulse animation for AI indicator */
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      /* Arrow hover animation */
+      button:hover .arrow-icon {
+        transform: translateX(4px);
+      }
+
+      /* Conversation Panel Styles */
+      .conversation-panel {
+        position: fixed;
+        top: 1rem;
+        right: 400px;
+        background: rgba(0, 0, 0, 0.85);
+        padding: 1rem;
+        border-radius: 8px;
+        max-width: 500px;
+        max-height: 400px;
+        overflow-y: auto;
+        z-index: 9998;
+        display: none;
+      }
+
+      .conversation-panel.show {
+        display: block;
+      }
+
+      .conversation-title {
+        color: #667eea;
+        font-weight: 600;
+        font-size: 0.875rem;
+        margin-bottom: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .conversation-message {
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .conversation-message:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+      }
+
+      .message-label {
+        color: #9ca3af;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+      }
+
+      .message-text {
+        color: white;
+        font-size: 0.875rem;
+        line-height: 1.4;
+      }
+
+      .message-user .message-label {
+        color: #10b981;
+      }
+
+      .message-avatar .message-label {
+        color: #667eea;
+      }
+
+      /* ===== Session Overlay (two-panel layout) ===== */
+      .session-overlay {
+        position: fixed;
+        inset: 0;
+        display: none;
+        z-index: 9999998;
+      }
+
+      .session-overlay.active {
+        display: flex;
+      }
+
+      /* Left: matches avatar dark background — 70% */
+      .session-left {
+        width: 70%;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        background: #1e1e1e;
+        position: relative;
+        min-width: 0;
+        border-right: 1px solid #333;
+      }
+
+      .session-left-title {
+        padding: 1.5rem 2rem;
+        color: #ffffff;
+        font-size: 1.5rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      /* Avatar video container — centered in the left panel */
+      .session-avatar-wrap {
+        flex: 1;
+        display: flex;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      #uneeqContainedLayout {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        background: #1e1e1e;
+      }
+
+      /* UneeQ injects its video/iframe here — force it to fill the container */
+      #uneeqContainedLayout > * {
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        border: none !important;
+      }
+
+      .session-controls {
+        padding: 1.5rem 2rem;
+        display: flex;
+        gap: 3rem;
+        align-items: center;
+        justify-content: center;
+        background: #1e1e1e;
+        border-top: 1px solid #333;
+      }
+
+      .session-ctrl-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        cursor: pointer;
+        background: none;
+        border: none;
+        color: #374151;
+        padding: 0;
+      }
+
+      .session-ctrl-btn .ctrl-circle {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: #2a2a2a;
+        border: 1.5px solid rgba(255, 255, 255, 0.15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s;
+      }
+
+      .session-ctrl-btn .ctrl-circle svg {
+        fill: #ffffff;
+      }
+
+
+      .session-ctrl-btn.active .ctrl-circle {
+        background: #dc2626;
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+
+      .session-ctrl-btn.active .ctrl-circle svg {
+        fill: #ffffff;
+      }
+
+      .session-ctrl-btn:hover,
+      .session-ctrl-btn:hover .ctrl-circle {
+        background: unset;
+      }
+
+      .session-ctrl-btn .ctrl-label {
+        font-size: 0.72rem;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.8);
+        text-align: center;
+        white-space: nowrap;
+      }
+
+      /* Right: white chat panel — 30% */
+      .session-right {
+        width: 30%;
+        flex-shrink: 0;
+        background: #f9fafb;
+        display: flex;
+        flex-direction: column;
+        border-left: 1px solid #e5e7eb;
+      }
+
+      .session-chat-header {
+        padding: 1rem 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        border-bottom: 1px solid #e5e7eb;
+        flex-shrink: 0;
+        background: #ffffff;
+      }
+
+      .session-chat-header .disclaimer {
+        flex: 1;
+        font-size: 0.8rem;
+        color: #6b7280;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      .session-chat-header .disclaimer svg {
+        opacity: 0.5;
+        fill: #6b7280;
+      }
+
+      .session-chat-header .end-btn {
+        background: #dc2626;
+        color: white;
+        border: none;
+        padding: 0.45rem 1rem;
+        border-radius: 6px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background 0.2s;
+        min-width: fit-content;
+      }
+
+      .session-chat-header .end-btn:hover {
+        background: #b91c1c;
+      }
+
+      .session-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        scrollbar-width: thin;
+        scrollbar-color: #d1d5db transparent;
+      }
+
+      .session-msg {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+      }
+
+      .session-msg-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .session-msg-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #dc2626;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: white;
+        flex-shrink: 0;
+      }
+
+      .session-msg-name {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #111827;
+      }
+
+      .session-msg-bubble {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 0 12px 12px 12px;
+        padding: 0.75rem 1rem;
+        font-size: 0.875rem;
+        color: #374151;
+        line-height: 1.55;
+        margin-left: 2rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      }
+
+      .session-msg.user .session-msg-bubble {
+        background: #fef2f2;
+        border-color: #fecaca;
+        border-radius: 12px 12px 0 12px;
+        margin-left: 0;
+        margin-right: 0;
+        align-self: flex-end;
+        color: #374151;
+      }
+
+      .session-msg.user .session-msg-header {
+        flex-direction: row-reverse;
+      }
+
+      .session-msg.user .session-msg-avatar {
+        background: #6b7280;
+      }
+
+      .session-feedback-row {
+        display: flex;
+        gap: 0.4rem;
+        margin-left: 2rem;
+        margin-top: 0.1rem;
+      }
+
+      .session-feedback-btn {
+        background: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 0.25rem 0.5rem;
+        cursor: pointer;
+        color: #9ca3af;
+        font-size: 0.8rem;
+        transition: background 0.15s;
+      }
+
+      .session-feedback-btn:hover {
+        background: #e5e7eb;
+      }
+
+      .session-input-area {
+        padding: 0.75rem 1.25rem 1rem;
+        border-top: 1px solid #e5e7eb;
+        flex-shrink: 0;
+        background: #ffffff;
+      }
+
+      .session-input-label {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin-bottom: 0.4rem;
+        font-weight: 500;
+      }
+
+      .session-input-row {
+        display: flex;
+        align-items: center;
+        background: #f9fafb;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        padding: 0.15rem 0.15rem 0.15rem 0.9rem;
+        gap: 0.5rem;
+      }
+
+      .session-input-row:focus-within {
+        border-color: #dc2626;
+        box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+      }
+
+      .session-input-row input {
+        flex: 1;
+        background: none;
+        border: none;
+        outline: none;
+        color: #111827;
+        font-size: 0.9rem;
+        padding: 0.55rem 0;
+      }
+
+      .session-input-row input::placeholder {
+        color: #9ca3af;
+      }
+
+      .session-send-btn {
+        height: 34px;
+        padding: 0 0.85rem;
+        border-radius: 8px;
+        background: #dc2626;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        flex-shrink: 0;
+        transition: background 0.2s;
+        color: white;
+        font-size: 0.82rem;
+        font-weight: 600;
+      }
+
+      .session-send-btn:hover {
+        background: #b91c1c;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Corner Logo -->
+    <!-- <div class="corner-logo">
+      <img src="uneeq.png" alt="UneeQ Logo" style="height: 24px" />
+      <!-- <span>Powered by UneeQ</span> -->
+    <!-- </div> -->
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div
+        class="sidebar-header"
+        style="padding: 1.5rem; border-bottom: 1px solid #e5e7eb"
+      >
+        <div style="display: flex; align-items: center; gap: 0.75rem">
+          <div
+            style="
+              width: 40px;
+              height: 40px;
+              background: linear-gradient(to bottom right, #dc2626, #b91c1c);
+              border-radius: 8px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+              flex-shrink: 0;
+            "
+          >
+            <span style="color: white; font-weight: bold; font-size: 1.25rem"
+              >L</span
+            >
+          </div>
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              justify-content: flex-start;
+              align-items: baseline;
+            "
+          >
+            <img
+              src="LillyLogo_RGB_Red_v3.svg"
+              alt="Lilly"
+              style="height: 24px; display: block; margin-bottom: 0.125rem"
+            />
+            <p
+              style="
+                font-size: 0.75rem;
+                color: #6b7280;
+                margin: 0;
+                line-height: 1;
+              "
+            >
+              Medical Portal
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="accordion-header" onclick="toggleAccordion()">
+          <span>Medicines</span>
+          <span class="accordion-icon" id="accordion-icon">−</span>
+        </button>
+        <div class="accordion-content active" id="accordion-content">
+          <ul style="padding: 0 1rem">
+            <li style="list-style: none">
+              <a
+                href="#"
+                style="
+                  position: relative;
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                  padding: 1rem;
+                  border-radius: 12px;
+                  background: linear-gradient(to right, #ef4444, #f97316);
+                  color: white;
+                  text-decoration: none;
+                  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+                  overflow: hidden;
+                  transition: all 0.3s;
+                "
+                onmouseover="
+                  this.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.2)';
+                  this.querySelector('.shine').style.transform =
+                    'translateX(-200%)';
+                "
+                onmouseout="
+                  this.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+                  this.querySelector('.shine').style.transform =
+                    'translateX(100%)';
+                "
+              >
+                <!-- Animated shine effect -->
+                <div
+                  class="shine"
+                  style="
+                    position: absolute;
+                    top: 0;
+                    right: 0;
+                    width: 80px;
+                    height: 100%;
+                    background: rgba(255, 255, 255, 0.1);
+                    transform: skewX(12deg) translateX(100%);
+                    transition: transform 0.7s;
+                  "
+                ></div>
+
+                <!-- Content -->
+                <div
+                  style="
+                    position: relative;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    flex: 1;
+                  "
+                >
+                  <div
+                    style="
+                      width: 40px;
+                      height: 40px;
+                      background: rgba(255, 255, 255, 0.2);
+                      backdrop-filter: blur(10px);
+                      border-radius: 8px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                    "
+                  >
+                    <span style="font-size: 1.25rem">💊</span>
+                  </div>
+                  <div>
+                    <p
+                      style="font-weight: bold; font-size: 0.875rem; margin: 0"
+                    >
+                      Mounjaro
+                    </p>
+                    <p
+                      style="
+                        font-size: 0.75rem;
+                        color: rgba(255, 255, 255, 0.8);
+                        margin: 0;
+                      "
+                    >
+                      Tirzepatide Injection
+                    </p>
+                  </div>
+                </div>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </nav>
+
+      <div
+        class="sidebar-footer"
+        style="
+          padding: 1rem;
+          border-top: 1px solid #e5e7eb;
+          background: linear-gradient(to bottom right, #fef2f2, #fff7ed);
+        "
+      >
+        <div style="margin-bottom: 1rem">
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+              margin-bottom: 0.5rem;
+            "
+          >
+            <div
+              style="
+                width: 32px;
+                height: 32px;
+                background: linear-gradient(to bottom right, #dc2626, #b91c1c);
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+              "
+            >
+              <span style="color: white; font-weight: bold; font-size: 0.875rem"
+                >L</span
+              >
+            </div>
+            <h3
+              style="
+                font-weight: 600;
+                color: #111827;
+                font-size: 0.875rem;
+                margin: 0;
+              "
+            >
+              Need Help?
+            </h3>
+          </div>
+          <p style="font-size: 0.75rem; color: #6b7280; margin: 0">
+            We're here to assist you 24/7
+          </p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0.5rem">
+          <a
+            href="https://teams.microsoft.com/l/chat/0/0?users=amit_kumar_singh99@lilly.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            style="
+              width: 100%;
+              background: linear-gradient(to right, #dc2626, #b91c1c);
+              color: white;
+              padding: 0.625rem 1rem;
+              border-radius: 8px;
+              font-size: 0.875rem;
+              font-weight: 500;
+              transition: all 0.3s;
+              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 0.5rem;
+              text-decoration: none;
+              border: none;
+              cursor: pointer;
+            "
+            onmouseover="
+              this.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.2)';
+              this.style.background =
+                'linear-gradient(to right, #b91c1c, #991b1b)';
+            "
+            onmouseout="
+              this.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+              this.style.background =
+                'linear-gradient(to right, #dc2626, #b91c1c)';
+            "
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              style="transition: transform 0.3s"
+              onmouseover="this.style.transform = 'scale(1.1)'"
+              onmouseout="this.style.transform = 'scale(1)'"
+            >
+              <path
+                d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+              ></path>
+            </svg>
+            <span>Chat with us</span>
+          </a>
+          <a
+            href="mailto:amit_kumar_singh99@lilly.com,chithresh.g@lilly.com,dharmavaram.yugandhar@lilly.com?subject=Contact%20from%20Mounjaro%20Digital%20Human&body=Team%3A%20Amit%20and%20Lilly%20IBU%20Team%0A%0ADevelopers%3A%20Chitresh%20and%20Yugandhar%0A%0A---%0A%0A"
+            style="
+              width: 100%;
+              background: white;
+              color: #374151;
+              padding: 0.625rem 1rem;
+              border-radius: 8px;
+              font-size: 0.875rem;
+              font-weight: 500;
+              border: 1px solid #d1d5db;
+              transition: all 0.3s;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 0.5rem;
+              text-decoration: none;
+              cursor: pointer;
+            "
+            onmouseover="
+              this.style.background = '#f9fafb';
+              this.style.borderColor = '#9ca3af';
+              this.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
+            "
+            onmouseout="
+              this.style.background = 'white';
+              this.style.borderColor = '#d1d5db';
+              this.style.boxShadow = 'none';
+            "
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              style="transition: transform 0.3s"
+              onmouseover="this.style.transform = 'scale(1.1)'"
+              onmouseout="this.style.transform = 'scale(1)'"
+            >
+              <path
+                d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"
+              ></path>
+            </svg>
+            <span>Contact Us</span>
+          </a>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Content Area -->
+      <div class="content-area">
+        <!-- Hero Section -->
+        <div
+          class="info-box"
+          style="
+            background: linear-gradient(to bottom right, #ffffff, #fef2f2);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            border: 1px solid #fee2e2;
+          "
+        >
+          <div style="display: flex; gap: 1.5rem; align-items: start">
+            <div style="flex: 1">
+              <div
+                style="
+                  display: inline-flex;
+                  align-items: center;
+                  gap: 0.5rem;
+                  padding: 0.25rem 0.75rem;
+                  background: #fee2e2;
+                  color: #b91c1c;
+                  border-radius: 9999px;
+                  font-size: 0.75rem;
+                  font-weight: 600;
+                  margin-bottom: 1rem;
+                "
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path
+                    d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423z"
+                  />
+                </svg>
+                <span>Active Treatment</span>
+              </div>
+              <h1
+                id="page-title"
+                style="
+                  color: #111827;
+                  margin-bottom: 0.5rem;
+                  font-size: 2rem;
+                  font-weight: 700;
+                "
+              >
+                Mounjaro® (tirzepatide) injection
+              </h1>
+              <p
+                style="
+                  color: #6b7280;
+                  font-size: 0.95rem;
+                  margin-bottom: 1.5rem;
+                "
+              >
+                2.5 mg / 5 mg / 7.5 mg / 10 mg / 12.5 mg / 15 mg
+              </p>
+              <div
+                style="
+                  display: inline-flex;
+                  align-items: center;
+                  gap: 0.5rem;
+                  font-size: 0.875rem;
+                  color: #4b5563;
+                  background: white;
+                  padding: 0.5rem 1rem;
+                  border-radius: 8px;
+                  border: 1px solid #e5e7eb;
+                  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+                "
+              >
+                <div
+                  style="
+                    width: 8px;
+                    height: 8px;
+                    background: #22c55e;
+                    border-radius: 50%;
+                    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+                  "
+                ></div>
+                <span>AI Assistant Available</span>
+              </div>
+            </div>
+            <!-- Medication Visual -->
+            <div style="display: none" class="medication-visual">
+              <div
+                style="
+                  width: 128px;
+                  height: 128px;
+                  background: linear-gradient(
+                    to bottom right,
+                    #fee2e2,
+                    #fed7aa
+                  );
+                  border-radius: 16px;
+                  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  border: 4px solid white;
+                "
+              >
+                <div style="text-align: center">
+                  <div
+                    style="
+                      width: 64px;
+                      height: 64px;
+                      background: linear-gradient(
+                        to bottom right,
+                        #ef4444,
+                        #f97316
+                      );
+                      border-radius: 50%;
+                      margin: 0 auto 0.5rem;
+                      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                    "
+                  ></div>
+                  <p
+                    style="font-size: 0.75rem; font-weight: 600; color: #374151"
+                  >
+                    Mounjaro
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Main Content Card -->
+        <div
+          id="page-description"
+          class="info-box"
+          style="
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            border: 1px solid #f3f4f6;
+          "
+        >
+          <div
+            style="
+              display: flex;
+              align-items: start;
+              gap: 1rem;
+              margin-bottom: 1.5rem;
+            "
+          >
+            <div
+              style="
+                width: 48px;
+                height: 48px;
+                background: linear-gradient(to bottom right, #3b82f6, #9333ea);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+                flex-shrink: 0;
+              "
+            >
+              <span style="font-size: 1.5rem">👋</span>
+            </div>
+            <div>
+              <h2
+                style="
+                  color: #111827;
+                  margin: 0 0 0.5rem 0;
+                  font-size: 1.5rem;
+                  font-weight: 700;
+                "
+              >
+                Hi, I'm your Digital Health Assistant!
+              </h2>
+              <p
+                style="
+                  color: #4b5563;
+                  font-size: 0.875rem;
+                  margin: 0;
+                  font-weight: 500;
+                "
+              >
+                Powered by AI • Available 24/7
+              </p>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 1.5rem">
+            <p style="color: #374141; margin-bottom: 1rem; line-height: 1.75">
+              I have been trained on the
+              <span
+                style="
+                  color: #dc2626;
+                  font-weight: 600;
+                  background: #fef2f2;
+                  padding: 0 0.25rem;
+                  border-radius: 4px;
+                "
+                >Summary of Product Characteristics</span
+              >
+              for Mounjaro and the
+              <span
+                style="
+                  color: #dc2626;
+                  font-weight: 600;
+                  background: #fef2f2;
+                  padding: 0 0.25rem;
+                  border-radius: 4px;
+                "
+                >Surpass and Surmount clinical trial studies</span
+              >. I'm here to help you with medical questions related to
+              Mounjaro.
+            </p>
+
+            <p style="color: #374141; margin-bottom: 1rem; line-height: 1.75">
+              <span style="font-weight: 600; color: #111827">Mounjaro</span>,
+              with the generic name
+              <span style="font-weight: 600; color: #111827">Tirzepatide</span>,
+              is an innovative treatment option from Eli Lilly for managing type
+              2 diabetes and chronic weight management.
+            </p>
+
+            <p style="color: #374141; line-height: 1.75">
+              Click the button below to start your conversation and explore how
+              Mounjaro can help your patients achieve better health outcomes.
+            </p>
+          </div>
+
+          <!-- Start Session Button -->
+          <div id="uneeq-container">
+            <button
+              onclick="startUneeqSession()"
+              style="
+                background: linear-gradient(to right, #dc2626, #b91c1c);
+                color: white;
+                padding: 1rem 2rem;
+                border-radius: 12px;
+                border: none;
+                font-weight: 500;
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                gap: 0.75rem;
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+                transition: all 0.3s;
+              "
+              onmouseover="
+                this.style.background =
+                  'linear-gradient(to right, #b91c1c, #991b1b)';
+                this.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.1)';
+              "
+              onmouseout="
+                this.style.background =
+                  'linear-gradient(to right, #dc2626, #b91c1c)';
+                this.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+              "
+            >
+              <span>Start Session</span>
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                style="transition: transform 0.3s"
+                class="arrow-icon"
+              >
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Info Cards Grid -->
+        <div
+          style="
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+          "
+        >
+          <!-- Technical Support Card -->
+          <div
+            class="info-box"
+            style="
+              background: linear-gradient(to bottom right, #eff6ff, #eef2ff);
+              border: 2px solid #bfdbfe;
+              padding: 1.5rem;
+              border-radius: 12px;
+              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+              transition: all 0.3s;
+            "
+            onmouseover="
+              this.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+            "
+            onmouseout="
+              this.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+            "
+          >
+            <div style="display: flex; align-items: start; gap: 0.75rem">
+              <div
+                style="
+                  width: 40px;
+                  height: 40px;
+                  background: #3b82f6;
+                  border-radius: 8px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  flex-shrink: 0;
+                  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                "
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                  <path
+                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"
+                  />
+                </svg>
+              </div>
+              <div>
+                <h3
+                  style="
+                    font-weight: 600;
+                    color: #111827;
+                    margin: 0 0 0.5rem 0;
+                    font-size: 1.05rem;
+                  "
+                >
+                  Need Technical Support?
+                </h3>
+                <p
+                  style="
+                    color: #374141;
+                    margin: 0;
+                    font-size: 0.875rem;
+                    line-height: 1.6;
+                  "
+                >
+                  Contact
+                  <a
+                    href="mailto:amit_kumar_singh99@lilly.com,chithresh.g@lilly.com,dharmavaram.yugandhar@lilly.com?subject=Contact%20from%20Mounjaro%20Digital%20Human&body=Team%3A%20Amit%20and%20Lilly%20IBU%20Team%0A%0ADevelopers%3A%20Chitresh%20and%20Yugandhar%0A%0A---%0A%0A"
+                    style="
+                      color: #2563eb;
+                      text-decoration: none;
+                      font-weight: 600;
+                    "
+                    >Tech@Lilly/IBU</a
+                  >
+                  for answers to your technical questions.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Adverse Events Card -->
+          <div
+            class="info-box"
+            style="
+              background: linear-gradient(to bottom right, #fff7ed, #fef2f2);
+              border: 2px solid #fed7aa;
+              padding: 1.5rem;
+              border-radius: 12px;
+              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+              transition: all 0.3s;
+            "
+            onmouseover="
+              this.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+            "
+            onmouseout="
+              this.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+            "
+          >
+            <div style="display: flex; align-items: start; gap: 0.75rem">
+              <div
+                style="
+                  width: 40px;
+                  height: 40px;
+                  background: #f97316;
+                  border-radius: 8px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  flex-shrink: 0;
+                  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                "
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="white"
+                  stroke="white"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"
+                  />
+                </svg>
+              </div>
+              <div>
+                <h3
+                  style="
+                    font-weight: 600;
+                    color: #111827;
+                    margin: 0 0 0.5rem 0;
+                    font-size: 1.05rem;
+                  "
+                >
+                  Report Adverse Events
+                </h3>
+                <p
+                  style="
+                    color: #374141;
+                    margin: 0;
+                    font-size: 0.875rem;
+                    line-height: 1.6;
+                  "
+                >
+                  Call
+                  <a
+                    href="tel:1-800-545-5979"
+                    style="
+                      color: #ea580c;
+                      text-decoration: none;
+                      font-weight: 600;
+                      white-space: nowrap;
+                    "
+                    onmouseover="this.style.textDecoration = 'underline'"
+                    onmouseout="this.style.textDecoration = 'none'"
+                  >
+                    1-800-LillyRx (1-800-545-5979)
+                  </a>
+                  to report adverse events or product complaints.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Demo Notice -->
+        <div
+          style="
+            background: linear-gradient(to right, #fdf2f8, #faf5ff);
+            border: 2px solid #fbcfe8;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+          "
+        >
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 0.75rem;
+            "
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="#db2777">
+              <path
+                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"
+              />
+            </svg>
+            <p
+              style="
+                color: #db2777;
+                font-weight: 600;
+                margin: 0;
+                font-size: 1rem;
+              "
+            >
+              ⚠️ MOCKUP - INTERNAL DEMO ONLY
+            </p>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Loader Overlay -->
+    <div class="loader-overlay" id="loader">
+      <div class="loader-content">
+        <div class="spinner">
+          <span class="spinner-text">
+            <img
+              src="LillyLogo_RGB_Red_v3.svg"
+              alt="Lilly"
+              style="height: 20px"
+            />
+          </span>
+        </div>
+        <p>Loading Digital Human...</p>
+      </div>
+    </div>
+
+    <!-- Session Overlay (two-panel: left=avatar, right=chat) -->
+    <div class="session-overlay" id="session-overlay">
+      <!-- Left: dark panel with contained UneeQ avatar -->
+      <div class="session-left">
+        <div class="session-left-title">Digital Assistant</div>
+        <!-- UneeQ renders inside this container -->
+        <div class="session-avatar-wrap">
+          <div id="uneeqContainedLayout"></div>
+        </div>
+        <div class="session-controls">
+          <!-- Mic toggle -->
+          <button class="session-ctrl-btn" id="mic-ctrl-btn" onclick="toggleMic()" title="Toggle Microphone">
+            <div class="ctrl-circle">
+              <svg viewBox="0 0 24 24" fill="white" width="24" height="24">
+                <path id="mic-ctrl-icon" d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
+              </svg>
+            </div>
+            <span class="ctrl-label" id="mic-ctrl-label">Mute Yourself</span>
+          </button>
+          <!-- Interrupt -->
+          <button class="session-ctrl-btn" onclick="interruptAvatar()" title="Interrupt Assistant">
+            <div class="ctrl-circle">
+              <svg viewBox="0 0 24 24" fill="white" width="24" height="24">
+                <path d="M6 6h12v12H6z"/>
+              </svg>
+            </div>
+            <span class="ctrl-label">Interrupt Assistant</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right: opaque chat panel -->
+      <div class="session-right">
+        <div class="session-chat-header">
+          <div class="disclaimer">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" style="flex-shrink:0;opacity:0.6">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+            </svg>
+            Fahad is an AI chatbot and does not provide medical advice.
+          </div>
+          <button class="end-btn" onclick="endSession()">End session</button>
+        </div>
+
+        <div class="session-messages" id="session-messages"></div>
+
+        <div class="session-input-area">
+          <div class="session-input-label">Ask Fahad</div>
+          <div class="session-input-row">
+            <input
+              type="text"
+              id="session-text-input"
+              placeholder="Start typing..."
+              onkeydown="if(event.key==='Enter') sendTextMessage()"
+            />
+            <button class="session-send-btn" onclick="sendTextMessage()" title="Send">
+              <svg viewBox="0 0 24 24" fill="white" width="16" height="16">
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+              </svg>
+              Send
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- UneeQ Digital Human Script -->
+    <script>
+      // Accordion toggle function
+      function toggleAccordion() {
+        const content = document.getElementById("accordion-content");
+        const icon = document.getElementById("accordion-icon");
+
+        if (content.classList.contains("active")) {
+          content.classList.remove("active");
+          icon.textContent = "+";
+        } else {
+          content.classList.add("active");
+          icon.textContent = "−";
+        }
+      }
+
+      // Avatar control functions
+      let isSpeakerMuted = false;
+      let isMicMuted = false;
+
+      function toggleSpeaker() {
+        isSpeakerMuted = !isSpeakerMuted;
+        if (uneeq) {
+          isSpeakerMuted
+            ? uneeq.muteDigitalHuman()
+            : uneeq.unmuteDigitalHuman();
+        }
+        console.log("Speaker", isSpeakerMuted ? "muted" : "unmuted");
+      }
+
+      function toggleMic() {
+        isMicMuted = !isMicMuted;
+        const btn = document.getElementById("mic-ctrl-btn");
+        const label = document.getElementById("mic-ctrl-label");
+        const icon = document.getElementById("mic-ctrl-icon");
+
+        if (isMicMuted) {
+          btn.classList.add("active");
+          label.textContent = "Un-mute Yourself";
+          icon.setAttribute(
+            "d",
+            "M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"
+          );
+          stopMicrophone();
+          console.log("Mic muted");
+        } else {
+          btn.classList.remove("active");
+          label.textContent = "Mute Yourself";
+          icon.setAttribute(
+            "d",
+            "M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"
+          );
+          startMicrophone();
+          console.log("Mic unmuted");
+        }
+      }
+
+      function endSession() {
+        if (uneeq && isSessionActive) {
+          uneeq.endSession();
+        }
+        stopMicrophone();
+        document.getElementById("session-overlay").classList.remove("active");
+        conversationHistory = [];
+        document.getElementById("session-messages").innerHTML = "";
+        hasSpokenWelcome = false;
+      }
+
+      function sendTextMessage() {
+        const input = document.getElementById("session-text-input");
+        const text = input.value.trim();
+        if (!text || !uneeq || !isSessionActive) return;
+        input.value = "";
+        addToConversation("user", text);
+        uneeq.chatPrompt(text, true);
+      }
+
+      function interruptAvatar() {
+        if (uneeq) {
+          uneeq.stopSpeaking();
+          console.log("Avatar interrupted");
+        }
+      }
+
+      let uneeq = null;
+      let isSessionActive = false;
+      let hasSpokenWelcome = false;
+
+      // Azure STT Configuration
+      const STT_CONFIG = {
+        language: "en-US",
+        silenceDelay: 1200,
+        sampleRate: 16000,
+        chunkSize: 4096,
+        sendInterval: 3000,
+        volumeThreshold: 0.01,
+      };
+
+      // Azure STT State
+      let isMicActive = false;
+      let isAvatarSpeaking = false;
+      let audioContext = null;
+      let processor = null;
+      let audioChunks = [];
+      let sendTimer = null;
+      let silenceTimer = null;
+      let pendingTranscript = "";
+      let conversationHistory = [];
+
+      // Model configuration
+      const modelConfig = {
+        name: "Cortex with RAG",
+        personaId: "dfa1a158-110b-4d8d-ac8b-ecf22dd9a631",
+        metadata: { model_type: "cortex-rag" },
+      };
+
+      // Alba's welcome greeting
+      const albaWelcomeGreeting =
+        "Hi, my name is Fahad. I'm excited to tell you about Mounjaro. Please interrupt me at any time with any questions you may have or if you would like me to dive deeper on any subject related to Mounjaro. Mounjaro, with the generic name tirzepatide, is an innovative treatment option from Eli Lilly for managing type 2 diabetes. What else would you like to know about Mounjaro?";
+
+      // Check if UneeQ is loaded
+      function isUneeqLoaded() {
+        return typeof Uneeq !== "undefined";
+      }
+
+      // Initialize UneeQ
+      function initializeUneeq() {
+        if (!isUneeqLoaded()) {
+          console.error(
+            "UneeQ library not loaded. Please check your internet connection.",
+          );
+          alert(
+            "Unable to load digital human. Please check your internet connection and refresh the page.",
+          );
+          return;
+        }
+
+        let uneeqOptions = {
+          connectionUrl: "https://api.uneeq.io",
+          personaId: modelConfig.personaId,
+          displayCallToAction: true,
+          renderContent: true,
+          layoutMode: "contained",
+          containedElementIdName: "uneeqContainedLayout",
+          containedAutoLayout: true,
+          cameraAnchorHorizontal: "center",
+          cameraAnchorDistance: "loose_close_up",
+          logLevel: "info",
+          // CUSTOM STT: Disable built-in microphone and VAD
+          enableMicrophone: false,
+          enableVad: false,
+          showUserInputInterface: false,
+          enableInterruptBySpeech: false,
+          autoStart: false,
+          showClosedCaptions: false,
+          captionsPosition: "bottom-left",
+          languageStrings: {},
+          customMetadata: modelConfig.metadata,
+        };
+
+        uneeq = new Uneeq(uneeqOptions);
+
+        console.log(`✅ Initialized ${modelConfig.name} model`);
+      }
+
+      // Start session function
+      function startUneeqSession() {
+        if (!uneeq) {
+          console.error("UneeQ not initialized");
+          alert("Digital human not initialized. Please refresh the page.");
+          return;
+        }
+
+        if (isSessionActive) {
+          console.log("Session already active");
+          return;
+        }
+
+        // Show loader
+        document.getElementById("loader").classList.add("active");
+
+        uneeq.startSession();
+        console.log("Starting UneeQ session...");
+      }
+
+      // ============= Azure STT Functions =============
+
+      // Start microphone capture
+      async function startMicrophone() {
+        try {
+          console.log("🎤 Starting custom STT microphone...");
+
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+          });
+
+          audioContext = new (
+            window.AudioContext || window.webkitAudioContext
+          )();
+          const source = audioContext.createMediaStreamSource(stream);
+
+          processor = audioContext.createScriptProcessor(
+            STT_CONFIG.chunkSize,
+            1,
+            1,
+          );
+
+          processor.onaudioprocess = (e) => {
+            if (!isMicActive || isAvatarSpeaking) return;
+
+            const inputData = e.inputBuffer.getChannelData(0);
+
+            let sum = 0;
+            for (let i = 0; i < inputData.length; i++) {
+              sum += inputData[i] * inputData[i];
+            }
+            const rms = Math.sqrt(sum / inputData.length);
+
+            if (rms > STT_CONFIG.volumeThreshold) {
+              audioChunks.push(new Float32Array(inputData));
+            }
+          };
+
+          source.connect(processor);
+          processor.connect(audioContext.destination);
+
+          sendTimer = setInterval(async () => {
+            if (audioChunks.length > 0 && isMicActive && !isAvatarSpeaking) {
+              const totalLength = audioChunks.reduce(
+                (acc, chunk) => acc + chunk.length,
+                0,
+              );
+              const combined = new Float32Array(totalLength);
+              let offset = 0;
+              for (const chunk of audioChunks) {
+                combined.set(chunk, offset);
+                offset += chunk.length;
+              }
+
+              const audioBlob = new Blob(
+                [float32ToWav(combined, audioContext.sampleRate)],
+                { type: "audio/wav" },
+              );
+
+              console.log(
+                `📤 Sending ${audioChunks.length} chunks, ${totalLength} samples`,
+              );
+
+              audioChunks = [];
+              await sendAudioToSTT(audioBlob);
+            }
+          }, STT_CONFIG.sendInterval);
+
+          isMicActive = true;
+          console.log("✅ Custom STT microphone started");
+        } catch (error) {
+          console.error("❌ Microphone error:", error);
+        }
+      }
+
+      // Stop microphone
+      function stopMicrophone() {
+        console.log("🔇 Stopping microphone...");
+        isMicActive = false;
+
+        if (sendTimer) {
+          clearInterval(sendTimer);
+          sendTimer = null;
+        }
+
+        if (processor) {
+          processor.disconnect();
+          processor = null;
+        }
+
+        if (audioContext) {
+          audioContext.close();
+          audioContext = null;
+        }
+
+        audioChunks = [];
+      }
+
+      // Send audio to Azure STT
+      async function sendAudioToSTT(audioBlob) {
+        try {
+          const formData = new FormData();
+          formData.append("audio", audioBlob, "audio.wav");
+          formData.append("language", STT_CONFIG.language);
+
+          const response = await fetch("/api/speech-to-text", {
+            method: "POST",
+            body: formData,
+          });
+
+          const data = await response.json();
+          const text = data.text || data.transcription?.DisplayText || "";
+          const confidence =
+            data.confidence || data.transcription?.NBest?.[0]?.Confidence || 0;
+
+          if (data.success && text && text.trim()) {
+            handleTranscription(text, confidence);
+          }
+        } catch (error) {
+          console.error("❌ STT Error:", error);
+        }
+      }
+
+      // Handle transcription
+      function handleTranscription(text, confidence) {
+        console.log("📝 Transcription:", text, "| Confidence:", confidence);
+
+        addToConversation("user", text);
+
+        pendingTranscript = pendingTranscript
+          ? pendingTranscript + " " + text
+          : text;
+
+        if (silenceTimer) clearTimeout(silenceTimer);
+
+        silenceTimer = setTimeout(() => {
+          if (pendingTranscript.trim() && uneeq && isSessionActive) {
+            console.log("📤 Sending to UneeQ:", pendingTranscript);
+            uneeq.chatPrompt(pendingTranscript.trim(), true);
+            pendingTranscript = "";
+          }
+        }, STT_CONFIG.silenceDelay);
+      }
+
+      // Add to conversation history (deduplicated)
+      function addToConversation(type, text) {
+        const last = conversationHistory[conversationHistory.length - 1];
+        if (last && last.type === type && last.text === text) return;
+        conversationHistory.push({ type, text, timestamp: new Date() });
+        updateConversationPanel();
+      }
+
+      // Update conversation panel
+      function updateConversationPanel() {
+        const messagesDiv = document.getElementById("session-messages");
+        if (!messagesDiv) return;
+
+        messagesDiv.innerHTML = "";
+
+        conversationHistory.forEach((msg) => {
+          const isUser = msg.type === "user";
+          const msgDiv = document.createElement("div");
+          msgDiv.className = `session-msg ${isUser ? "user" : "avatar"}`;
+
+          const header = document.createElement("div");
+          header.className = "session-msg-header";
+
+          const avatar = document.createElement("div");
+          avatar.className = "session-msg-avatar";
+          avatar.textContent = isUser ? "Y" : "F";
+
+          const name = document.createElement("div");
+          name.className = "session-msg-name";
+          name.textContent = isUser ? "You" : "Fahad";
+
+          header.appendChild(avatar);
+          header.appendChild(name);
+
+          const bubble = document.createElement("div");
+          bubble.className = "session-msg-bubble";
+          bubble.textContent = msg.text;
+
+          msgDiv.appendChild(header);
+          msgDiv.appendChild(bubble);
+
+          if (!isUser) {
+            const feedbackRow = document.createElement("div");
+            feedbackRow.className = "session-feedback-row";
+            feedbackRow.innerHTML =
+              '<button class="session-feedback-btn" title="Helpful">👍</button>' +
+              '<button class="session-feedback-btn" title="Not helpful">👎</button>';
+            msgDiv.appendChild(feedbackRow);
+          }
+
+          messagesDiv.appendChild(msgDiv);
+        });
+
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+
+      // Convert Float32Array to WAV
+      function float32ToWav(float32Array, sampleRate) {
+        const buffer = new ArrayBuffer(44 + float32Array.length * 2);
+        const view = new DataView(buffer);
+
+        writeString(view, 0, "RIFF");
+        view.setUint32(4, 36 + float32Array.length * 2, true);
+        writeString(view, 8, "WAVE");
+        writeString(view, 12, "fmt ");
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeString(view, 36, "data");
+        view.setUint32(40, float32Array.length * 2, true);
+
+        let offset = 44;
+        for (let i = 0; i < float32Array.length; i++, offset += 2) {
+          const s = Math.max(-1, Math.min(1, float32Array[i]));
+          view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+        }
+
+        return buffer;
+      }
+
+      function writeString(view, offset, string) {
+        for (let i = 0; i < string.length; i++) {
+          view.setUint8(offset + i, string.charCodeAt(i));
+        }
+      }
+
+      // Initialize on page load
+      document.addEventListener("DOMContentLoaded", function () {
+        // Wait for UneeQ library to load before initializing
+        if (isUneeqLoaded()) {
+          initializeUneeq();
+        } else {
+          console.log("Waiting for UneeQ library to load...");
+          // Retry after a short delay
+          setTimeout(() => {
+            if (isUneeqLoaded()) {
+              initializeUneeq();
+            } else {
+              console.error("UneeQ library failed to load");
+              alert(
+                "Failed to load digital human library. Please check your internet connection and refresh the page.",
+              );
+            }
+          }, 2000);
+        }
+      });
+
+      // Handle UneeQ messages
+      window.addEventListener("UneeqMessage", (event) => {
+        const msg = event.detail;
+        console.log("Received UneeQ message: ", msg);
+
+        // Handle domain error specifically
+        if (
+          msg.uneeqMessageType === "CreateSessionFailed" &&
+          msg.msg.includes("Domain not allowed")
+        ) {
+          console.error("🚨 Domain Error:", msg.msg);
+          console.log(
+            "💡 Solution: Add your domain to UneeQ dashboard whitelist",
+          );
+          alert(
+            "Domain not whitelisted in UneeQ. Please add your domain to the UneeQ dashboard.",
+          );
+          return;
+        }
+
+        switch (msg.uneeqMessageType) {
+          case "SessionStateUpdate":
+            if (msg.live) {
+              // Hide loader when avatar is shown
+              document.getElementById("loader").classList.remove("active");
+              document.body.classList.add("uneeq-session-live");
+              isSessionActive = true;
+              // Show session overlay
+              document.getElementById("session-overlay").classList.add("active");
+              console.log("✅ Session is now live");
+
+              // Speak Alba's welcome greeting once when session starts
+              if (!hasSpokenWelcome && uneeq) {
+                hasSpokenWelcome = true;
+                console.log("🎤 Speaking welcome greeting...");
+                uneeq.speak(albaWelcomeGreeting);
+                // speak() doesn't fire answerUtterance, so add it manually
+                addToConversation("avatar", albaWelcomeGreeting);
+              }
+
+              // AUTO-START: Begin custom STT listening
+              console.log("🎤 Auto-starting custom STT microphone...");
+              startMicrophone();
+            } else {
+              document.body.classList.remove("uneeq-session-live");
+              isSessionActive = false;
+              hasSpokenWelcome = false;
+              // Hide session overlay
+              document.getElementById("session-overlay").classList.remove("active");
+              // Stop microphone
+              if (isMicActive) {
+                stopMicrophone();
+              }
+              console.log("Session ended");
+            }
+            break;
+
+          case "PromptResult":
+            // Capture user's spoken/typed question
+            if (msg.promptResult && msg.promptResult.question) {
+              addToConversation("user", msg.promptResult.question);
+            }
+            // Avatar's response text
+            if (
+              msg.promptResult &&
+              msg.promptResult.response &&
+              msg.promptResult.response.text
+            ) {
+              addToConversation("avatar", msg.promptResult.response.text);
+            }
+            break;
+
+          case "AvatarStartedSpeaking":
+            isAvatarSpeaking = true;
+            // Pause custom STT while avatar speaks
+            if (isMicActive) {
+              console.log("⏸️ Pausing microphone during avatar speech...");
+              stopMicrophone();
+            }
+            break;
+
+          case "IncomingPersonaResponse":
+            // May contain user's question in some SDK versions
+            if (msg.userQuestion && msg.userQuestion.trim()) {
+              addToConversation("user", msg.userQuestion.trim());
+            }
+            break;
+
+          case "AvatarStoppedSpeaking":
+            console.log("🤐 Avatar stopped speaking");
+            isAvatarSpeaking = false;
+            // Auto-resume custom STT
+            if (isSessionActive && !isMicActive) {
+              console.log("🔄 Auto-resuming microphone...");
+              startMicrophone();
+            }
+            break;
+
+          default:
+            console.log("📨 UneeQ msg:", msg.uneeqMessageType, JSON.stringify(msg));
+            break;
+        }
+      });
+    </script>
+  </body>
+</html>

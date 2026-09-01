@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LLM Streaming Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 50px auto;
+        padding: 20px;
+      }
+      #question {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 10px;
+        font-size: 16px;
+      }
+      button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        cursor: pointer;
+        font-size: 16px;
+        margin-right: 10px;
+      }
+      button:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+      #response {
+        border: 1px solid #ddd;
+        padding: 15px;
+        margin-top: 20px;
+        min-height: 100px;
+        background-color: #f9f9f9;
+        white-space: pre-wrap;
+      }
+      #events {
+        border: 1px solid #ddd;
+        padding: 15px;
+        margin-top: 20px;
+        max-height: 300px;
+        overflow-y: auto;
+        background-color: #f0f0f0;
+        font-size: 12px;
+      }
+      .event {
+        margin: 5px 0;
+        padding: 5px;
+        border-left: 3px solid #007bff;
+        background-color: white;
+      }
+      .event.start {
+        border-left-color: #28a745;
+      }
+      .event.token {
+        border-left-color: #007bff;
+      }
+      .event.metadata {
+        border-left-color: #ffc107;
+      }
+      .event.end {
+        border-left-color: #dc3545;
+      }
+      .event.error {
+        border-left-color: #dc3545;
+        background-color: #ffe6e6;
+      }
+      #status {
+        margin: 10px 0;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>LLM Streaming Test</h1>
+
+    <div>
+      <label for="question">Enter your question:</label>
+      <input
+        type="text"
+        id="question"
+        value="Tell me a short story about AI"
+        placeholder="Enter your question..."
+      />
+    </div>
+
+    <div>
+      <button onclick="testStreaming()">Test Streaming</button>
+      <button onclick="testNonStreaming()">Test Non-Streaming</button>
+      <button onclick="clearResponse()">Clear</button>
+    </div>
+
+    <div id="status">Ready</div>
+    <div id="response"></div>
+
+    <h3>Events Log:</h3>
+    <div id="events"></div>
+
+    <script>
+      function setStatus(message) {
+        document.getElementById("status").textContent = message;
+      }
+
+      function addEvent(eventType, data) {
+        const eventsDiv = document.getElementById("events");
+        const eventDiv = document.createElement("div");
+        eventDiv.className = `event ${eventType}`;
+
+        const timestamp = new Date().toLocaleTimeString();
+        eventDiv.innerHTML = `<strong>[${timestamp}] ${eventType}:</strong> ${
+          typeof data === "object" ? JSON.stringify(data, null, 2) : data
+        }`;
+
+        eventsDiv.appendChild(eventDiv);
+        eventsDiv.scrollTop = eventsDiv.scrollHeight;
+      }
+
+      async function testStreaming() {
+        const question = document.getElementById("question").value;
+        const responseDiv = document.getElementById("response");
+        const eventsDiv = document.getElementById("events");
+
+        if (!question.trim()) {
+          alert("Please enter a question");
+          return;
+        }
+
+        responseDiv.textContent = "";
+        eventsDiv.innerHTML = "";
+        setStatus("Connecting to stream...");
+
+        try {
+          const response = await fetch("/api/llm-query", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              question: question,
+              streaming: true,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          setStatus("Streaming...");
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+
+          while (true) {
+            const { done, value } = await reader.read();
+
+            if (done) {
+              setStatus("Stream completed");
+              break;
+            }
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split("\n");
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                try {
+                  const jsonData = JSON.parse(line.substring(6));
+                  addEvent(jsonData.event, jsonData.data);
+
+                  if (jsonData.event === "token") {
+                    responseDiv.textContent += jsonData.data;
+                  } else if (jsonData.event === "error") {
+                    setStatus("Error: " + jsonData.data.message);
+                  } else if (jsonData.event === "end") {
+                    setStatus("Completed successfully");
+                  }
+                } catch (e) {
+                  console.error("Error parsing SSE data:", e);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Streaming error:", error);
+          setStatus("Error: " + error.message);
+          addEvent("error", error.message);
+        }
+      }
+
+      async function testNonStreaming() {
+        const question = document.getElementById("question").value;
+        const responseDiv = document.getElementById("response");
+        const eventsDiv = document.getElementById("events");
+
+        if (!question.trim()) {
+          alert("Please enter a question");
+          return;
+        }
+
+        responseDiv.textContent = "";
+        eventsDiv.innerHTML = "";
+        setStatus("Loading...");
+
+        try {
+          const response = await fetch("/api/llm-query", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              question: question,
+              streaming: false,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            responseDiv.textContent = data.data;
+            addEvent("complete_response", data);
+            setStatus("Completed successfully");
+          } else {
+            setStatus("Error: " + data.message);
+            addEvent("error", data);
+          }
+        } catch (error) {
+          console.error("Non-streaming error:", error);
+          setStatus("Error: " + error.message);
+          addEvent("error", error.message);
+        }
+      }
+
+      function clearResponse() {
+        document.getElementById("response").textContent = "";
+        document.getElementById("events").innerHTML = "";
+        setStatus("Ready");
+      }
+    </script>
+  </body>
+</html>

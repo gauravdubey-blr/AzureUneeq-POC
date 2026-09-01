@@ -1,0 +1,820 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UneeQ + Azure STT Integration</title>
+    <!-- 
+      AUTO-START INTEGRATION:
+      - UneeQ session starts automatically on page load
+      - Azure STT microphone begins listening immediately when session is ready
+      - Audio pauses when avatar speaks, resumes when avatar stops
+      - Uses /api/speech-to-text endpoint for transcription
+      - Implements 1.2s silence delay before sending to UneeQ via chatPrompt()
+    -->
+    <script src="https://cdn.uneeq.io/hosted-experience/deploy/index.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        background: #1a1a1a;
+        color: white;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      #uneeq-container {
+        width: 100%;
+        height: 100%;
+        position: relative;
+      }
+
+      .controls {
+        position: fixed;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 1rem;
+        z-index: 9999;
+      }
+
+      .control-btn {
+        padding: 1rem 2rem;
+        border-radius: 12px;
+        border: none;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      }
+
+      .control-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+      }
+
+      .control-btn.primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+
+      .control-btn.success {
+        background: #22c55e;
+        color: white;
+      }
+
+      .control-btn.danger {
+        background: #ef4444;
+        color: white;
+      }
+
+      .control-btn.recording {
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.7;
+        }
+      }
+
+      .control-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .status-bar {
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        background: rgba(0, 0, 0, 0.8);
+        padding: 1rem;
+        border-radius: 8px;
+        z-index: 9999;
+        max-width: 300px;
+      }
+
+      .status-item {
+        margin-bottom: 0.5rem;
+        font-size: 0.875rem;
+      }
+
+      .status-item:last-child {
+        margin-bottom: 0;
+      }
+
+      .status-label {
+        color: #9ca3af;
+        margin-right: 0.5rem;
+      }
+
+      .status-value {
+        color: white;
+        font-weight: 600;
+      }
+
+      .status-indicator {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 0.5rem;
+      }
+
+      .status-indicator.active {
+        background: #22c55e;
+        animation: blink 2s ease-in-out infinite;
+      }
+
+      .status-indicator.inactive {
+        background: #ef4444;
+      }
+
+      @keyframes blink {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
+      }
+
+      .transcript-box {
+        position: fixed;
+        bottom: 6rem;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.9);
+        padding: 1rem 1.5rem;
+        border-radius: 12px;
+        max-width: 600px;
+        z-index: 9998;
+        display: none;
+      }
+
+      .transcript-box.show {
+        display: block;
+      }
+
+      .transcript-text {
+        color: white;
+        font-size: 1rem;
+        line-height: 1.5;
+      }
+
+      .transcript-interim {
+        color: #9ca3af;
+        font-style: italic;
+      }
+
+      .loader {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        z-index: 10000;
+      }
+
+      .spinner {
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-top: 4px solid #667eea;
+        border-radius: 50%;
+        width: 60px;
+        height: 60px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1rem;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .loader-text {
+        color: white;
+        font-size: 1.2rem;
+      }
+
+      .conversation-panel {
+        position: fixed;
+        top: 1rem;
+        left: 1rem;
+        background: rgba(0, 0, 0, 0.85);
+        padding: 1rem;
+        border-radius: 8px;
+        max-width: 500px;
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 9998;
+        display: none;
+      }
+
+      .conversation-panel.show {
+        display: block;
+      }
+
+      .conversation-title {
+        color: #667eea;
+        font-weight: 600;
+        font-size: 0.875rem;
+        margin-bottom: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .conversation-message {
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .conversation-message:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+      }
+
+      .message-label {
+        color: #9ca3af;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+      }
+
+      .message-text {
+        color: white;
+        font-size: 0.875rem;
+        line-height: 1.4;
+      }
+
+      .message-user .message-label {
+        color: #10b981;
+      }
+
+      .message-avatar .message-label {
+        color: #667eea;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- UneeQ Container -->
+    <div id="uneeq-container"></div>
+
+    <!-- Conversation History Panel -->
+    <div class="conversation-panel" id="conversation-panel">
+      <div class="conversation-title">📝 Conversation</div>
+      <div id="conversation-messages"></div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <div class="status-item">
+        <span class="status-indicator" id="uneeq-indicator"></span>
+        <span class="status-label">UneeQ:</span>
+        <span class="status-value" id="uneeq-status">Disconnected</span>
+      </div>
+      <div class="status-item">
+        <span class="status-indicator" id="mic-indicator"></span>
+        <span class="status-label">Microphone:</span>
+        <span class="status-value" id="mic-status">Off</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">Azure STT:</span>
+        <span class="status-value" id="stt-status">Ready</span>
+      </div>
+    </div>
+
+    <!-- Transcript Display -->
+    <div class="transcript-box" id="transcript-box">
+      <div class="transcript-text" id="transcript-text"></div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls" style="display: none">
+      <button
+        class="control-btn success recording"
+        id="mic-btn"
+        onclick="toggleMicrophone()"
+        disabled
+      >
+        🎤 Listening...
+      </button>
+      <button
+        class="control-btn danger"
+        id="stop-btn"
+        onclick="stopSession()"
+        disabled
+      >
+        End Session
+      </button>
+    </div>
+
+    <!-- Loader -->
+    <div class="loader" id="loader" style="display: block">
+      <div class="spinner"></div>
+      <div class="loader-text">Loading Digital Human...</div>
+    </div>
+
+    <script>
+      // Configuration
+      const CONFIG = {
+        // UneeQ Configuration
+        personaId: "8df9a75e-5062-4f4f-baed-f95c952a806f",
+
+        // Azure STT Configuration
+        language: "en-US",
+        silenceDelay: 1200, // 1.2 seconds
+
+        // Audio Configuration
+        sampleRate: 16000,
+        chunkSize: 4096,
+        sendInterval: 3000, // Send audio every 3 seconds (reduced API calls)
+        volumeThreshold: 0.01, // Minimum volume to consider as speech
+      };
+
+      // State
+      let uneeq = null;
+      let isSessionActive = false;
+      let isMicActive = false;
+      let isAvatarSpeaking = false;
+      let mediaRecorder = null;
+      let audioContext = null;
+      let processor = null;
+      let silenceTimer = null;
+      let pendingTranscript = "";
+      let audioChunks = [];
+      let sendTimer = null;
+      let conversationHistory = [];
+
+      // Initialize UneeQ with custom STT disabled
+      function initializeUneeq() {
+        console.log("🚀 Initializing UneeQ...");
+
+        const uneeqOptions = {
+          connectionUrl: "https://api.uneeq.io",
+          personaId: CONFIG.personaId,
+
+          // CRITICAL: Disable built-in speech recognition
+          enableMicrophone: false,
+          enableVad: false,
+
+          // UI Configuration
+          renderContent: true,
+          layoutMode: "fullScreen",
+          showUserInputInterface: false,
+          displayCallToAction: false,
+          showClosedCaptions: true,
+
+          // Other settings
+          autoStart: false,
+          containedElementIdName: "uneeq-container",
+          logLevel: "info",
+        };
+
+        uneeq = new Uneeq(uneeqOptions);
+
+        // CRITICAL: Must call both init() and startSession()
+        uneeq.init();
+
+        console.log("✅ UneeQ initialized");
+      }
+
+      // Start UneeQ session
+      function startSession() {
+        if (!uneeq) {
+          initializeUneeq();
+        }
+
+        console.log("▶️ Starting UneeQ session...");
+        document.getElementById("loader").style.display = "block";
+        updateStatus("uneeq", "Connecting", false);
+
+        uneeq.startSession();
+      }
+
+      // Stop UneeQ session
+      function stopSession() {
+        if (isMicActive) {
+          stopMicrophone();
+        }
+
+        if (uneeq) {
+          console.log("⏹️ Stopping UneeQ session...");
+          uneeq.endSession();
+        }
+
+        updateStatus("uneeq", "Disconnected", false);
+        document.getElementById("start-btn").disabled = false;
+        document.getElementById("stop-btn").disabled = true;
+        document.getElementById("mic-btn").disabled = true;
+      }
+
+      // Toggle microphone
+      function toggleMicrophone() {
+        if (isMicActive) {
+          stopMicrophone();
+        } else {
+          startMicrophone();
+        }
+      }
+
+      // Start microphone capture
+      async function startMicrophone() {
+        try {
+          console.log("🎤 Starting microphone...");
+
+          // Get microphone access
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              sampleRate: 44100,
+            },
+          });
+
+          // Create audio context
+          audioContext = new (
+            window.AudioContext || window.webkitAudioContext
+          )();
+          const source = audioContext.createMediaStreamSource(stream);
+
+          // Create processor for audio chunks
+          processor = audioContext.createScriptProcessor(
+            CONFIG.chunkSize,
+            1,
+            1,
+          );
+
+          processor.onaudioprocess = (e) => {
+            if (!isMicActive || isAvatarSpeaking) return;
+
+            const inputData = e.inputBuffer.getChannelData(0);
+
+            // Check volume level to avoid sending silence
+            let sum = 0;
+            for (let i = 0; i < inputData.length; i++) {
+              sum += inputData[i] * inputData[i];
+            }
+            const rms = Math.sqrt(sum / inputData.length);
+
+            // Only collect audio if above volume threshold
+            if (rms > CONFIG.volumeThreshold) {
+              audioChunks.push(new Float32Array(inputData));
+            }
+          };
+
+          source.connect(processor);
+          processor.connect(audioContext.destination);
+
+          // Send audio chunks periodically (not on every process event)
+          sendTimer = setInterval(async () => {
+            if (audioChunks.length > 0 && isMicActive && !isAvatarSpeaking) {
+              // Combine all chunks
+              const totalLength = audioChunks.reduce(
+                (acc, chunk) => acc + chunk.length,
+                0,
+              );
+              const combined = new Float32Array(totalLength);
+              let offset = 0;
+              for (const chunk of audioChunks) {
+                combined.set(chunk, offset);
+                offset += chunk.length;
+              }
+
+              // Convert to WAV and send
+              const audioBlob = new Blob(
+                [float32ToWav(combined, audioContext.sampleRate)],
+                { type: "audio/wav" },
+              );
+
+              console.log(
+                `📤 Sending ${audioChunks.length} chunks, ${totalLength} samples (${(totalLength / audioContext.sampleRate).toFixed(2)}s)`,
+              );
+
+              // Clear chunks before sending
+              audioChunks = [];
+
+              // Send to Azure STT backend
+              await sendAudioToSTT(audioBlob);
+            }
+          }, CONFIG.sendInterval);
+
+          isMicActive = true;
+          updateStatus("mic", "Active", true);
+
+          const micBtn = document.getElementById("mic-btn");
+          micBtn.textContent = "🔇 Disable Mic";
+          micBtn.classList.remove("success");
+          micBtn.classList.add("danger");
+
+          console.log("✅ Microphone started");
+        } catch (error) {
+          console.error("❌ Microphone error:", error);
+          alert("Failed to access microphone: " + error.message);
+        }
+      }
+
+      // Stop microphone
+      function stopMicrophone() {
+        console.log("🔇 Stopping microphone...");
+
+        isMicActive = false;
+
+        if (sendTimer) {
+          clearInterval(sendTimer);
+          sendTimer = null;
+        }
+
+        if (processor) {
+          processor.disconnect();
+          processor = null;
+        }
+
+        if (audioContext) {
+          audioContext.close();
+          audioContext = null;
+        }
+
+        audioChunks = [];
+
+        updateStatus("mic", "Off", false);
+
+        const micBtn = document.getElementById("mic-btn");
+        micBtn.textContent = "🎤 Enable Mic";
+        micBtn.classList.remove("danger");
+        micBtn.classList.add("success");
+
+        console.log("✅ Microphone stopped");
+      }
+
+      // Send audio to Azure STT backend
+      async function sendAudioToSTT(audioBlob) {
+        try {
+          const formData = new FormData();
+          formData.append("audio", audioBlob, "audio.wav");
+          formData.append("language", CONFIG.language);
+
+          const response = await fetch("/api/speech-to-text", {
+            method: "POST",
+            body: formData,
+          });
+
+          const data = await response.json();
+
+          // Extract text from response (supports both formats)
+          const text = data.text || data.transcription?.DisplayText || "";
+          const confidence =
+            data.confidence || data.transcription?.NBest?.[0]?.Confidence || 0;
+
+          if (data.success && text && text.trim()) {
+            handleTranscription(text, confidence);
+          } else {
+            console.log("⚠️ No speech detected in audio chunk");
+          }
+        } catch (error) {
+          console.error("❌ STT Error:", error);
+        }
+      }
+
+      // Handle transcription result
+      function handleTranscription(text, confidence) {
+        console.log("📝 Transcription:", text, "| Confidence:", confidence);
+
+        // Show transcript in popup
+        showTranscript(text);
+
+        // Add to conversation history
+        addToConversation("user", text);
+
+        // Accumulate text
+        pendingTranscript = pendingTranscript
+          ? pendingTranscript + " " + text
+          : text;
+
+        // Clear existing timer
+        if (silenceTimer) clearTimeout(silenceTimer);
+
+        // Wait for silence before sending to UneeQ
+        silenceTimer = setTimeout(() => {
+          if (pendingTranscript.trim()) {
+            sendToUneeq(pendingTranscript.trim());
+            pendingTranscript = "";
+          }
+        }, CONFIG.silenceDelay);
+      }
+
+      // Send text to UneeQ
+      function sendToUneeq(text) {
+        if (!uneeq || !isSessionActive) {
+          console.warn("⚠️ UneeQ not ready");
+          return;
+        }
+
+        console.log("📤 Sending to UneeQ:", text);
+
+        // Send to UneeQ using chatPrompt
+        uneeq.chatPrompt(text, true);
+
+        updateStatus("stt", "Sent: " + text.substring(0, 20) + "...");
+      }
+
+      // Show transcript in UI
+      function showTranscript(text) {
+        const transcriptBox = document.getElementById("transcript-box");
+        const transcriptText = document.getElementById("transcript-text");
+
+        transcriptText.textContent = text;
+        transcriptBox.classList.add("show");
+
+        // Hide after 3 seconds
+        setTimeout(() => {
+          transcriptBox.classList.remove("show");
+        }, 3000);
+      }
+
+      // Add message to conversation history
+      function addToConversation(type, text) {
+        conversationHistory.push({ type, text, timestamp: new Date() });
+        updateConversationPanel();
+      }
+
+      // Update conversation panel display
+      function updateConversationPanel() {
+        const panel = document.getElementById("conversation-panel");
+        const messagesDiv = document.getElementById("conversation-messages");
+
+        // Show panel
+        panel.classList.add("show");
+
+        // Clear and rebuild messages
+        messagesDiv.innerHTML = "";
+
+        conversationHistory.forEach((msg) => {
+          const msgDiv = document.createElement("div");
+          msgDiv.className = `conversation-message message-${msg.type}`;
+
+          const label = document.createElement("div");
+          label.className = "message-label";
+          label.textContent = msg.type === "user" ? "You" : "Avatar";
+
+          const text = document.createElement("div");
+          text.className = "message-text";
+          text.textContent = msg.text;
+
+          msgDiv.appendChild(label);
+          msgDiv.appendChild(text);
+          messagesDiv.appendChild(msgDiv);
+        });
+
+        // Auto-scroll to bottom
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+
+      // Update status indicators
+      function updateStatus(type, message, isActive) {
+        const statusEl = document.getElementById(`${type}-status`);
+        const indicatorEl = document.getElementById(`${type}-indicator`);
+
+        if (statusEl) {
+          statusEl.textContent = message;
+        }
+
+        if (indicatorEl) {
+          indicatorEl.className =
+            "status-indicator " + (isActive ? "active" : "inactive");
+        }
+      }
+
+      // Convert Float32Array to WAV format
+      function float32ToWav(float32Array, sampleRate) {
+        const buffer = new ArrayBuffer(44 + float32Array.length * 2);
+        const view = new DataView(buffer);
+
+        // WAV header
+        writeString(view, 0, "RIFF");
+        view.setUint32(4, 36 + float32Array.length * 2, true);
+        writeString(view, 8, "WAVE");
+        writeString(view, 12, "fmt ");
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeString(view, 36, "data");
+        view.setUint32(40, float32Array.length * 2, true);
+
+        // Convert float32 to int16
+        let offset = 44;
+        for (let i = 0; i < float32Array.length; i++, offset += 2) {
+          const s = Math.max(-1, Math.min(1, float32Array[i]));
+          view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+        }
+
+        return buffer;
+      }
+
+      function writeString(view, offset, string) {
+        for (let i = 0; i < string.length; i++) {
+          view.setUint8(offset + i, string.charCodeAt(i));
+        }
+      }
+
+      // Handle UneeQ messages
+      window.addEventListener("UneeqMessage", (event) => {
+        const msg = event.detail;
+        console.log("📨 UneeQ message:", msg.uneeqMessageType);
+
+        switch (msg.uneeqMessageType) {
+          case "SessionLive":
+            console.log("✅ Session is live");
+            document.getElementById("loader").style.display = "none";
+            isSessionActive = true;
+            updateStatus("uneeq", "Connected", true);
+
+            // Show controls when session is ready
+            document.querySelector(".controls").style.display = "flex";
+            document.getElementById("stop-btn").disabled = false;
+            document.getElementById("mic-btn").disabled = false;
+
+            // AUTO-START: Begin listening immediately when session is ready
+            console.log("🎤 Auto-starting microphone...");
+            startMicrophone();
+            break;
+
+          case "SessionEnded":
+            console.log("⏹️ Session ended");
+            isSessionActive = false;
+            updateStatus("uneeq", "Disconnected", false);
+
+            if (isMicActive) {
+              stopMicrophone();
+            }
+            break;
+
+          case "AvatarStartedSpeaking":
+            console.log("🗣️ Avatar started speaking");
+            isAvatarSpeaking = true;
+
+            // Capture avatar's response text if available
+            if (msg.answerUtterance) {
+              addToConversation("avatar", msg.answerUtterance);
+            }
+
+            // Pause listening while avatar speaks to avoid echo/feedback
+            if (isMicActive) {
+              console.log("⏸️ Pausing microphone during avatar speech...");
+              stopMicrophone();
+            }
+            break;
+
+          case "AvatarStoppedSpeaking":
+            console.log("🤐 Avatar stopped speaking");
+            isAvatarSpeaking = false;
+
+            // Auto-resume listening after avatar finishes speaking
+            if (isSessionActive && !isMicActive) {
+              console.log("🔄 Auto-resuming microphone...");
+              startMicrophone();
+            }
+            break;
+
+          case "CreateSessionFailed":
+            console.error("❌ Session creation failed:", msg.msg);
+            document.getElementById("loader").style.display = "none";
+            alert("Failed to create session: " + msg.msg);
+            break;
+        }
+      });
+
+      // Initialize on page load
+      document.addEventListener("DOMContentLoaded", () => {
+        console.log("🎬 Page loaded - Auto-starting UneeQ + Azure STT");
+        updateStatus("stt", "Ready");
+
+        // Auto-initialize and start UneeQ session
+        initializeUneeq();
+        startSession();
+      });
+    </script>
+  </body>
+</html>

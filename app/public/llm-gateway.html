@@ -1,0 +1,73 @@
+<html>
+  <head>
+    <script src="https://cdn.uneeq.io/hosted-experience/deploy/index.js"></script>
+    <script>
+      let uneeqOptions = {
+        connectionUrl: "https://api.uneeq.io",
+        personaId: "5af1e988-af9e-477d-a549-53c2838c185f",
+        displayCallToAction: true,
+        renderContent: true,
+        layoutMode: "fullScreen",
+        cameraAnchorHorizontal: "center",
+        cameraAnchorDistance: "loose_close_up",
+        logLevel: "info",
+        enableMicrophone: false,
+        showUserInputInterface: true,
+        enableVad: true,
+        autoStart: false,
+        containedAutoLayout: true,
+        showClosedCaptions: true,
+        captionsPosition: "bottom-left",
+        languageStrings: {},
+        customMetadata: { example_key: "example_value" },
+        speechRecognitionLocales: "en-US:ja-JP",
+        speechRecognitionHintPhrasesBoost: 0,
+      };
+      const uneeq = new Uneeq(uneeqOptions);
+    </script>
+    <style>
+      body {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Digital Human - LLM Gateway</h1>
+    <button onclick="uneeq.startSession()">Start</button>
+    <script>
+      window.addEventListener("UneeqMessage", (event) => {
+        const msg = event.detail;
+        console.log("Received UneeQ message: ", msg);
+
+        // Handle domain error specifically
+        if (
+          msg.uneeqMessageType === "CreateSessionFailed" &&
+          msg.msg.includes("Domain not allowed")
+        ) {
+          console.error("🚨 Domain Error:", msg.msg);
+          console.log(
+            "💡 Solution: Add your domain to UneeQ dashboard whitelist"
+          );
+          alert(
+            "Domain not whitelisted in UneeQ. Please add your domain to the UneeQ dashboard."
+          );
+          return;
+        }
+
+        switch (msg.uneeqMessageType) {
+          case "SessionStateUpdate":
+            // example only
+            if (msg.live) {
+              document.body.classList.add("uneeq-session-live");
+            } else {
+              document.body.classList.remove("uneeq-session-live");
+            }
+            break;
+          // ... Handle other message types here
+          default:
+            break;
+        }
+      });
+    </script>
+  </body>
+</html>
