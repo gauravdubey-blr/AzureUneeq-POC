@@ -12,12 +12,20 @@ const config = {
     port: process.env.PORT || 3000,
   },
 
-  // Azure Speech Services configuration
+  // Azure Speech Services configuration.
+  //
+  // NOTE: voice endpoints, region, key, default voice and format are resolved in
+  // config/voiceInstance.js — that module is the single source of truth for voice
+  // input/output and is what the STT/TTS services read. The fields here remain
+  // for backward compatibility with existing callers of `config.azure.speech`.
   azure: {
     speech: {
-      region: "eastus2",
-      subscriptionKey: process.env.AZURE_SUBSCRIPTION_KEY,
-      voice: "en-US-AriaNeural",
+      region: process.env.AZURE_VOICE_REGION || process.env.AZURE_SPEECH_REGION || "eastus2",
+      subscriptionKey:
+        process.env.AZURE_VOICE_KEY ||
+        process.env.AZURE_SUBSCRIPTION_KEY ||
+        process.env.AZURE_SPEECH_KEY,
+      voice: process.env.AZURE_VOICE_TTS_VOICE || "en-US-AriaNeural",
       speakingStyle: "friendly",
       outputFormat: process.env.AZURE_OUTPUT_FORMAT,
       prosodySpeed: "medium",
@@ -78,14 +86,18 @@ function validateConfig() {
     process.exit(1);
   }
 
-  // Validate Azure Speech Services region (token auth doesn't need API key)
-  if (!config.azure.speech.region) {
-    console.warn(
-      "Warning: Azure Speech Services region not configured. TTS functionality may not work.",
-    );
+  // Report which voice instance resolved, and surface any gaps in it.
+  const voiceInstance = require("./voiceInstance");
+  const view = voiceInstance.publicView();
+  console.log("🎙️  Voice instance:", JSON.stringify(view));
+  for (const w of voiceInstance.voice.warnings) {
+    console.warn(`⚠️  ${w}`);
+  }
+  if (view.ready) {
+    console.log("✓ Voice input/output configured");
   } else {
-    console.log(
-      "✓ Azure Speech Services region configured for token-based authentication",
+    console.warn(
+      "Warning: voice instance not ready — /api/voice/* and the legacy speech routes will return 503",
     );
   }
 

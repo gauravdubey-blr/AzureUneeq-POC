@@ -15,9 +15,22 @@ class LLMGatewayService {
     // Build token URL dynamically
     this.tokenUrl = `https://login.microsoftonline.com/${this.tenantId}/oauth2/v2.0/token`;
 
-    // Disable SSL verification for development (if needed)
-    if (process.env.NODE_ENV === "development") {
-      process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
+    // TLS verification is NOT disabled automatically any more.
+    //
+    // NODE_TLS_REJECT_UNAUTHORIZED is process-global: setting it here switched
+    // off certificate validation for every outbound HTTPS call in the app, not
+    // just this service's. It also fired on NODE_ENV=development, which is the
+    // default in many local setups. It now requires an explicit, separate
+    // opt-in and warns loudly when used.
+    if (
+      process.env.ALLOW_INSECURE_TLS === "true" &&
+      process.env.NODE_ENV !== "production"
+    ) {
+      process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0";
+      console.warn(
+        "⚠️  ALLOW_INSECURE_TLS=true — TLS certificate verification is DISABLED " +
+          "process-wide. Never use this outside local development.",
+      );
     }
   }
 
