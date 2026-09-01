@@ -8,12 +8,23 @@ const trainingController = require("../controllers/trainingController");
 const { MOUNJARO_SYSTEM_PROMPT } = require("../constants/cortexPrompts");
 
 const multer = require("multer");
+const voiceInstance = require("../config/voiceInstance");
+const { ALLOWED_STT_MIME, TTS_FORMATS } = voiceInstance;
 
-// Configure multer for file uploads (simple)
+// Configure multer for file uploads. The cap comes from the voice instance
+// (VOICE_MAX_AUDIO_BYTES) so it is tuned in one place alongside the new routes.
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  limits: { fileSize: voiceInstance.voice.maxAudioBytes },
 });
+
+/**
+ * Map a voice service error onto a status. VoiceConfigError -> 503,
+ * VoiceUpstreamError -> its mapped status, anything else -> 500.
+ */
+function voiceStatus(error) {
+  return error && error.statusCode ? error.statusCode : 500;
+}
 
 /**
  * Simple Text-to-Speech API endpoint
@@ -22,18 +33,19 @@ const upload = multer({
  */
 router.post("/text-to-speech", async (req, res) => {
   try {
-    console.log("TTS API: Received request body:", req.body);
+    // Do NOT log req.body here — this route historically accepted an Azure
+    // subscription key in the payload, and logging it leaked the key to stdout.
+    const { preset, text, format } = req.body || {};
+    console.log("TTS API: Received request", {
+      preset,
+      textLength: text ? String(text).length : 0,
+      format: format || voiceInstance.voice.defaultFormat,
+    });
 
-    const { apiKey, preset, text } = req.body;
-
-    // Validate required fields
-    if (!apiKey) {
-      return res.status(400).json({
-        error: "API key is required",
-        message: "Please provide apiKey in the request body",
-      });
-    }
-
+    // NOTE: `apiKey` in the payload is accepted but ignored. Credentials come
+    // from the server's configured voice instance. Previously this field was
+    // required but never actually used for the outbound call, so callers could
+    // send anything and it still worked.
     if (!preset) {
       return res.status(400).json({
         error: "Preset is required",
@@ -48,25 +60,31 @@ router.post("/text-to-speech", async (req, res) => {
       });
     }
 
-    console.log("TTS API: Processing text:", text);
     console.log("TTS API: Using preset/voice:", preset);
-    console.log(
-      "TTS API: Using API key:",
-      apiKey ? `***${apiKey.slice(-4)}` : "None",
-    );
 
-    // Use the preset as the voice parameter and WAV format for better compatibility
+    const formatName = String(
+      format || voiceInstance.voice.defaultFormat,
+    ).toLowerCase();
+    if (!TTS_FORMATS[formatName]) {
+      return res.status(400).json({
+        error: "Unsupported format",
+        message: `Expected one of: ${Object.keys(TTS_FORMATS).join(", ")}`,
+      });
+    }
+
     const audioStream = await azureTTSService.textToSpeech(
       text,
       preset,
-      apiKey,
-      "riff-16khz-16bit-mono-pcm", // Use PCM format instead of WAV for better playback support
+      undefined, // key comes from the configured voice instance, not the caller
+      formatName,
     );
 
-    // Send audio response
+    // Send audio response. Content-Type now reflects the actual format instead
+    // of always claiming application/octet-stream.
     res.set({
-      "Content-Type": "application/octet-stream",
+      "Content-Type": TTS_FORMATS[formatName].contentType,
       "Transfer-Encoding": "chunked",
+      "Cache-Control": "no-store",
     });
 
     // Handle stream errors
@@ -89,8 +107,8 @@ router.post("/text-to-speech", async (req, res) => {
 
     audioStream.pipe(res);
   } catch (error) {
-    console.error("TTS API Error:", error);
-    res.status(500).json({
+    console.error("TTS API Error:", error.message);
+    res.status(voiceStatus(error)).json({
       error: "Text-to-speech conversion failed",
       message: error.message,
       timestamp: new Date().toISOString(),
@@ -108,10 +126,23 @@ router.post("/speech-to-text", upload.single("audio"), async (req, res) => {
     console.log("STT API: Received request");
 
     if (!req.file) {
-      sttLogger.error(new Error("Audio file is required"));
+      // This branch previously called an undefined `sttLogger`, which threw a
+      // ReferenceError and turned a missing-file 400 into an unhandled 500.
+      console.error("STT API: audio file missing from request");
       return res.status(400).json({
         error: "Audio file is required",
         message: "Please upload an audio file",
+      });
+    }
+
+    const declaredType = String(req.file.mimetype || "")
+      .split(";")[0]
+      .trim()
+      .toLowerCase();
+    if (!ALLOWED_STT_MIME.has(declaredType)) {
+      return res.status(415).json({
+        error: "Unsupported audio content type",
+        message: `'${declaredType}' is not an accepted audio type`,
       });
     }
 
@@ -119,21 +150,29 @@ router.post("/speech-to-text", upload.single("audio"), async (req, res) => {
 
     console.log("STT API: Processing audio file:", req.file.originalname);
 
-    const transcription = await azureSTTService.speechToText(
+    const result = await azureSTTService.speechToText(
       req.file.buffer,
-      language || "en-US",
+      language || voiceInstance.voice.locale,
+      { contentType: req.body.contentType },
     );
 
     res.json({
       success: true,
-      transcription: transcription,
+      // `text` is the normalized transcript — prefer it in new code.
+      text: result.text,
+      confidence: result.confidence,
+      durationMs: result.durationMs,
+      language: result.language,
+      // `transcription` kept for backward compatibility with existing callers
+      // that read Azure's raw detailed payload.
+      transcription: result.raw,
       fileName: req.file.originalname,
       fileSize: req.file.size,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("STT API Error:", error);
-    res.status(500).json({
+    console.error("STT API Error:", error.message);
+    res.status(voiceStatus(error)).json({
       error: "Speech-to-text conversion failed",
       message: error.message,
       timestamp: new Date().toISOString(),
@@ -149,9 +188,10 @@ router.get("/health", (req, res) => {
   res.json({
     status: "healthy",
     services: {
-      tts: "Azure TTS Service (Simple)",
-      stt: "Azure STT Service (Simple)",
+      tts: "Azure TTS Service",
+      stt: "Azure STT Service",
     },
+    voiceInstance: voiceInstance.publicView(),
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
   });

@@ -6,10 +6,93 @@ http://localhost:3000
 ```
 
 ## Table of Contents
-1. [LLM Query Endpoint](#llm-query-endpoint)
-2. [Text-to-Speech Endpoint](#text-to-speech-endpoint)
-3. [Speech-to-Text Endpoint](#speech-to-text-endpoint)
-4. [Health Check](#health-check)
+1. [REST Voice API](#rest-voice-api)  ← new
+2. [LLM Query Endpoint](#llm-query-endpoint)
+3. [Text-to-Speech Endpoint](#text-to-speech-endpoint) (legacy)
+4. [Speech-to-Text Endpoint](#speech-to-text-endpoint) (legacy)
+5. [Health Check](#health-check)
+
+---
+
+## REST Voice API
+
+Voice input and voice output now resolve through a single voice instance
+(`config/voiceInstance.js`) instead of endpoints hard-coded in the STT/TTS
+services. Repointing the app at a new Azure resource is a config change.
+
+| Route | In | Out |
+|-------|----|-----|
+| `POST /api/voice/transcribe` | `multipart/form-data`: `audio` file, optional `language` | `{ text, confidence, durationMs, language }` |
+| `POST /api/voice/speak` | JSON `{ text, voice?, format?, rate?, pitch?, style?, ssml?, encoding? }` | audio bytes, or JSON with base64 when `encoding: "base64"` |
+| `POST /api/voice/converse` | `multipart/form-data`: `audio`, optional `language`/`voice`/`format`/`speak`/`model` | `{ transcript, reply, audio (base64) }` |
+| `GET /api/voice/config` | — | resolved instance + route list (no secrets) |
+
+`format` is one of `pcm16` (default), `pcm24`, `wav`, `mp3`, `mp3hq`, `raw24`.
+`pcm16` is the format the legacy `/api/text-to-speech` route always returned, so
+existing clients get byte-identical audio.
+
+### Voice input
+
+```bash
+curl -F audio=@turn.wav -F language=en-US \
+     http://localhost:3000/api/voice/transcribe
+```
+
+```json
+{
+  "success": true,
+  "text": "What is the starting dose of Mounjaro?",
+  "confidence": 0.93,
+  "durationMs": 2100,
+  "language": "en-US"
+}
+```
+
+### Voice output
+
+```bash
+curl -H 'Content-Type: application/json' \
+     -d '{"text":"The starting dose is 2.5 mg once weekly.","format":"mp3"}' \
+     http://localhost:3000/api/voice/speak --output reply.mp3
+```
+
+Add `"encoding":"base64"` to get JSON instead of raw bytes — usually what a
+browser feeding an `AudioContext` wants.
+
+### One full turn
+
+```bash
+curl -F audio=@question.wav -F model=cortex \
+     http://localhost:3000/api/voice/converse
+```
+
+Chains transcribe → model → synthesize. `model=cortex` (default) routes through
+`cortexService` with the Mounjaro system prompt; `model=llm` uses the LLM
+Gateway. Send `speak=false` to get text only. If synthesis fails, the turn still
+returns the model reply with a `synthesisError` field rather than failing.
+
+### Error mapping
+
+| Status | Meaning |
+|--------|---------|
+| `400` | Bad request body, bad audio, or unsupported format/encoding |
+| `413` | Audio over `VOICE_MAX_AUDIO_BYTES`, or text over `VOICE_MAX_TTS_CHARS` |
+| `415` | Audio content type not in the allowlist |
+| `429` | Passed through from Azure so callers can back off |
+| `503` | Voice instance not configured |
+| `502` | Upstream failure. An Azure `401`/`403` is reported as `502` on purpose — a bad server-side key is not the caller's authorization problem |
+
+Upstream error bodies are logged server-side but never returned to the caller.
+
+### Tests
+
+```bash
+npm test        # node --test "test/*.test.js" — 67 checks
+```
+
+Azure is never contacted: the services expose an injectable `httpClient` and the
+route handlers are driven with fake req/res. No new dependencies — Node's
+built-in test runner only.
 
 ---
 
@@ -148,6 +231,17 @@ curl -H "Content-Type: application/json" \
 
 ## Text-to-Speech Endpoint
 
+> **Legacy.** Still supported and now backed by the same service as
+> `/api/voice/speak`. Two behaviour changes:
+> - `apiKey` in the payload is **accepted but ignored**. Credentials come from
+>   the server's voice instance. Previously this field was *required* but never
+>   actually used for the outbound call, and the whole request body — including
+>   the key — was logged to stdout. Both issues are fixed.
+> - `Content-Type` now reflects the real audio format instead of always claiming
+>   `application/octet-stream`. Add an optional `format` field to choose one.
+>
+> Prefer `/api/voice/speak` for new work.
+
 ### POST `/api/text-to-speech`
 
 Converts text to speech audio.
@@ -172,6 +266,15 @@ curl -X POST \
 ---
 
 ## Speech-to-Text Endpoint
+
+> **Legacy.** Still supported and now backed by the same service as
+> `/api/voice/transcribe`. The response gains normalized `text`, `confidence`,
+> `durationMs` and `language` fields; the original `transcription` field still
+> carries Azure's raw detailed payload, so existing callers keep working.
+> A missing-file request now correctly returns `400` (it previously hit an
+> undefined logger and threw a `500`).
+>
+> Prefer `/api/voice/transcribe` for new work.
 
 ### POST `/api/speech-to-text`
 

@@ -5,7 +5,9 @@ const path = require("path");
 const { config, validateConfig } = require("./config/config");
 const azureAuthService = require("./services/azureAuthService");
 const apiSpeechRoutes = require("./routes/speechRoutes");
+const apiVoiceRoutes = require("./routes/voiceRoutes");
 const sdkRoutes = require("./routes/sdkRoutes");
+const voiceInstance = require("./config/voiceInstance");
 
 // Import middleware
 const requestLogger = require("./middleware/requestLogger");
@@ -67,11 +69,17 @@ app.get("/health", (req, res) => {
       config: "loaded",
       auth: "initialized",
       tts: "available",
+      voice: voiceInstance.isReady() ? "ready" : "not-configured",
     },
+    // Which Azure resource voice input/output resolved to. No secrets.
+    voiceInstance: voiceInstance.publicView(),
   });
 });
 
 // API routes
+// Voice routes are mounted before the legacy speech routes so /api/voice/* is
+// matched by the dedicated router.
+app.use("/api/voice", apiVoiceRoutes);
 app.use("/api", apiSpeechRoutes);
 app.use("/sdk", sdkRoutes);
 
@@ -90,6 +98,10 @@ async function startServer() {
     );
     console.log(`🧪 SDK Test Page at http://localhost:${PORT}/sdk-test`);
     console.log(`❤️  Health check at http://localhost:${PORT}/health`);
+    console.log(`🎙️  Voice input   POST http://localhost:${PORT}/api/voice/transcribe`);
+    console.log(`🔊 Voice output  POST http://localhost:${PORT}/api/voice/speak`);
+    console.log(`💬 Voice turn    POST http://localhost:${PORT}/api/voice/converse`);
+    console.log(`⚙️  Voice config  GET  http://localhost:${PORT}/api/voice/config`);
   });
 }
 
