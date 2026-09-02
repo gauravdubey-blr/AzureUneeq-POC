@@ -2,7 +2,8 @@ name: Build & Deploy — UneeQ POC
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/rest-voice-api]
+  workflow_dispatch:
 
 env:
   IMAGE_NAME: lara2registry.azurecr.io/uneeq-poc

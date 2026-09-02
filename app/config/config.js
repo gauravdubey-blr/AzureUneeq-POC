@@ -63,7 +63,7 @@ const config = {
     clientId: process.env.CORTEX_CLIENT_ID,
     clientSecret: process.env.CORTEX_CLIENT_SECRET,
     tenantId: process.env.CORTEX_TENANT_ID,
-    baseURL: process.env.CORTEX_BASE_URL || "https://api.cortex.lilly.com",
+    baseURL: process.env.CORTEX_BASE_URL || "https://gateway.apim.lilly.com/cortex/model",
     scope: process.env.CORTEX_SCOPE || "api://cortex.lilly.com/.default",
     tokenUrl: process.env.CORTEX_TOKEN_URL,
   },
@@ -76,14 +76,14 @@ function validateConfig() {
   const { clientId, clientSecret, tenantId } = config.azure.auth;
 
   if (!clientId || !clientSecret || !tenantId) {
-    console.error(
-      "Error: Missing required Azure credentials in environment variables:",
+    console.warn(
+      "Warning: Missing Azure AD credentials (CLIENT_ID, CLIENT_SECRET, TENANT_ID). Auth-dependent routes may be unavailable.",
     );
-    console.error("CLIENT_ID:", clientId ? "✓ Set" : "✗ Missing");
-    console.error("CLIENT_SECRET:", clientSecret ? "✓ Set" : "✗ Missing");
-    console.error("TENANT_ID:", tenantId ? "✓ Set" : "✗ Missing");
-    console.error("Please check your .env file and add the missing values.");
-    process.exit(1);
+    console.warn("CLIENT_ID:", clientId ? "✓ Set" : "✗ Missing");
+    console.warn("CLIENT_SECRET:", clientSecret ? "✓ Set" : "✗ Missing");
+    console.warn("TENANT_ID:", tenantId ? "✓ Set" : "✗ Missing");
+  } else {
+    console.log("✓ Azure AD credentials configured");
   }
 
   // Report which voice instance resolved, and surface any gaps in it.

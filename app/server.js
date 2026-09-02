@@ -15,6 +15,7 @@ const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
 const PORT = config.server.port;
+let authInitialized = false;
 
 /**
  * Initialize application modules
@@ -25,7 +26,7 @@ async function initializeApp() {
     validateConfig();
 
     // Initialize Azure authentication
-    await azureAuthService.initialize();
+    authInitialized = await azureAuthService.initialize();
 
     console.log("✓ Application modules initialized successfully");
   } catch (error) {
@@ -67,7 +68,7 @@ app.get("/health", (req, res) => {
     timestamp: new Date().toISOString(),
     modules: {
       config: "loaded",
-      auth: "initialized",
+      auth: authInitialized ? "initialized" : "not-configured",
       tts: "available",
       voice: voiceInstance.isReady() ? "ready" : "not-configured",
     },

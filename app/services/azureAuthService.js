@@ -13,14 +13,19 @@ class AzureAuthService {
     this.tokenRequest = {
       scopes: config.azure.auth.scope,
     };
+  }
 
-    this.initializeClient();
+  isConfigured() {
+    const { clientId, clientSecret, tenantId } = config.azure.auth;
+    return Boolean(clientId && clientSecret && tenantId);
   }
 
   /**
    * Initialize the MSAL client application
    */
   initializeClient() {
+    if (this.clientApp) return;
+
     const msalConfig = {
       auth: {
         clientId: config.azure.auth.clientId,
@@ -38,7 +43,13 @@ class AzureAuthService {
    * @returns {Promise<string|null>} Access token or null if failed
    */
   async getAccessToken() {
+    if (!this.isConfigured()) {
+      return null;
+    }
+
     try {
+      this.initializeClient();
+
       const result = await this.clientApp.acquireTokenByClientCredential(
         this.tokenRequest
       );
@@ -61,6 +72,11 @@ class AzureAuthService {
    * Initialize authentication and acquire initial token
    */
   async initialize() {
+    if (!this.isConfigured()) {
+      console.warn("Skipping Azure authentication initialization: credentials not configured");
+      return false;
+    }
+
     console.log("Initializing Azure authentication...");
     const token = await this.getAccessToken();
     return token !== null;
