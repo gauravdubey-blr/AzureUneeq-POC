@@ -89,6 +89,11 @@ const MODES = {
       `https://${r}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1`,
     tts: (r) => `https://${r}.tts.speech.microsoft.com/cognitiveservices/v1`,
   },
+  live: {
+    stt: (_r, base) =>
+      `${base}/stt/speech/recognition/conversation/cognitiveservices/v1`,
+    tts: (_r, base) => `${base}/tts/cognitiveservices/v1`,
+  },
 };
 
 /**
@@ -97,12 +102,14 @@ const MODES = {
  */
 function load() {
   const region = firstSet(["AZURE_VOICE_REGION", "AZURE_SPEECH_REGION"], "eastus2");
+  const liveEndpoint = stripTrailingSlash(firstSet(["AZURE_VOICE_LIVE_ENDPOINT"]));
   const key = firstSet([
     "AZURE_VOICE_KEY",
+    "AZURE_VOICE_LIVE_KEY",
     "AZURE_SUBSCRIPTION_KEY", // legacy name used by config.azure.speech.subscriptionKey
     "AZURE_SPEECH_KEY",
   ]);
-  const mode = firstSet(["AZURE_VOICE_MODE"], "cognitive").toLowerCase();
+  const mode = firstSet(["AZURE_VOICE_MODE"], liveEndpoint ? "live" : "cognitive").toLowerCase();
   const baseUrl = stripTrailingSlash(firstSet(["AZURE_VOICE_BASE_URL"]));
 
   const warnings = [];
@@ -111,7 +118,18 @@ function load() {
   let ttsUrl = stripTrailingSlash(firstSet(["AZURE_VOICE_TTS_URL"]));
 
   if (!sttUrl || !ttsUrl) {
-    if (mode === "apim") {
+    if (mode === "live") {
+      if (!liveEndpoint) {
+        warnings.push(
+          "AZURE_VOICE_MODE=live but AZURE_VOICE_LIVE_ENDPOINT is not set — falling back to 'cognitive' mode",
+        );
+        sttUrl = sttUrl || MODES.cognitive.stt(region);
+        ttsUrl = ttsUrl || MODES.cognitive.tts(region);
+      } else {
+        sttUrl = sttUrl || MODES.live.stt(region, liveEndpoint);
+        ttsUrl = ttsUrl || MODES.live.tts(region, liveEndpoint);
+      }
+    } else if (mode === "apim") {
       if (!baseUrl) {
         warnings.push(
           "AZURE_VOICE_MODE=apim but AZURE_VOICE_BASE_URL is not set — falling back to 'cognitive' mode",
@@ -128,7 +146,7 @@ function load() {
       const m = MODES[mode] || MODES.cognitive;
       if (!MODES[mode]) {
         warnings.push(
-          `Unknown AZURE_VOICE_MODE='${mode}' — expected cognitive|speech|apim; using 'cognitive'`,
+          `Unknown AZURE_VOICE_MODE='${mode}' — expected live|cognitive|speech|apim; using 'cognitive'`,
         );
       }
       sttUrl = sttUrl || m.stt(region);
@@ -146,7 +164,7 @@ function load() {
 
     locale: firstSet(["AZURE_VOICE_STT_LOCALE"], "en-US"),
     voice: firstSet(
-      ["AZURE_VOICE_TTS_VOICE", "AZURE_VOICE_NAME"],
+      ["VOICELIVE_VOICE", "AZURE_VOICE_TTS_VOICE", "AZURE_VOICE_NAME"],
       "en-US-AriaNeural",
     ),
     defaultFormat: firstSet(["AZURE_VOICE_TTS_FORMAT"], DEFAULT_TTS_FORMAT),
