@@ -27,6 +27,27 @@ function voiceStatus(error) {
 }
 
 /**
+ * Wrap multer so its errors (e.g. oversized file) become the right status
+ * instead of falling through to the generic 500 error handler — multer's
+ * errors don't carry a `.status`/`.statusCode` the global handler understands.
+ */
+function uploadAudio(req, res, next) {
+  upload.single("audio")(req, res, (err) => {
+    if (!err) return next();
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(413).json({
+        error: "Audio too large",
+        message: `Audio exceeds ${voiceInstance.voice.maxAudioBytes} bytes`,
+      });
+    }
+    return res.status(400).json({
+      error: "Invalid audio upload",
+      message: err.message,
+    });
+  });
+}
+
+/**
  * Simple Text-to-Speech API endpoint
  * POST /api/text-to-speech
  * Expected payload: { "apiKey": "<api-key>", "preset": "<preset/voice>", "text": "<text to speak>" }
@@ -120,7 +141,7 @@ router.post("/text-to-speech", async (req, res) => {
  * Simple Speech-to-Text API endpoint
  * POST /api/speech-to-text
  */
-router.post("/speech-to-text", upload.single("audio"), async (req, res) => {
+router.post("/speech-to-text", uploadAudio, async (req, res) => {
 
   try {
     console.log("STT API: Received request");
