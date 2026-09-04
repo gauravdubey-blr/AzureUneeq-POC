@@ -1,0 +1,227 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AzureUneeq Voice API",
+    "version": "1.0.0",
+    "description": "API-only contract for voice input/output, health, and legacy speech endpoints."
+  },
+  "servers": [
+    {
+      "url": "https://uneeq-poc.azurewebsites.net",
+      "description": "Production"
+    },
+    {
+      "url": "http://localhost:3000",
+      "description": "Local"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "API index",
+        "responses": {
+          "200": {
+            "description": "API metadata"
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Service health",
+        "responses": {
+          "200": {
+            "description": "Health payload"
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "API health",
+        "responses": {
+          "200": {
+            "description": "API health payload"
+          }
+        }
+      }
+    },
+    "/api/voice/config": {
+      "get": {
+        "summary": "Voice runtime configuration",
+        "responses": {
+          "200": {
+            "description": "Resolved voice config (no secrets)"
+          }
+        }
+      }
+    },
+    "/api/voice/speak": {
+      "post": {
+        "summary": "Voice output (TTS)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["text"],
+                "properties": {
+                  "text": { "type": "string" },
+                  "ssml": { "type": "string" },
+                  "voice": { "type": "string" },
+                  "format": {
+                    "type": "string",
+                    "enum": ["pcm16", "pcm24", "wav", "mp3", "mp3hq", "raw24"],
+                    "default": "pcm16"
+                  },
+                  "encoding": {
+                    "type": "string",
+                    "enum": ["binary", "base64"],
+                    "default": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Audio output",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "audio": { "type": "string", "description": "Base64 audio when encoding=base64" },
+                    "contentType": { "type": "string" },
+                    "format": { "type": "string" },
+                    "voice": { "type": "string" }
+                  }
+                }
+              },
+              "audio/wav": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": { "description": "Validation error" },
+          "502": { "description": "Upstream error" },
+          "503": { "description": "Voice not configured" }
+        }
+      }
+    },
+    "/api/voice/transcribe": {
+      "post": {
+        "summary": "Voice input (STT)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["audio"],
+                "properties": {
+                  "audio": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "language": {
+                    "type": "string",
+                    "default": "en-US"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Transcription response" },
+          "400": { "description": "Invalid request" },
+          "413": { "description": "Audio too large" },
+          "415": { "description": "Unsupported media type" }
+        }
+      }
+    },
+    "/api/voice/converse": {
+      "post": {
+        "summary": "Voice turn (STT -> model -> TTS)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["audio"],
+                "properties": {
+                  "audio": { "type": "string", "format": "binary" },
+                  "model": { "type": "string", "enum": ["cortex", "llm"] },
+                  "speak": { "type": "string", "default": "true" },
+                  "format": { "type": "string", "enum": ["pcm16", "pcm24", "wav", "mp3", "mp3hq", "raw24"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Conversation turn response" },
+          "400": { "description": "Invalid request" },
+          "502": { "description": "Upstream error" }
+        }
+      }
+    },
+    "/api/text-to-speech": {
+      "post": {
+        "summary": "Legacy TTS",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["preset", "text"],
+                "properties": {
+                  "preset": { "type": "string" },
+                  "text": { "type": "string" },
+                  "format": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Audio stream" },
+          "400": { "description": "Validation error" }
+        }
+      }
+    },
+    "/api/speech-to-text": {
+      "post": {
+        "summary": "Legacy STT",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["audio"],
+                "properties": {
+                  "audio": { "type": "string", "format": "binary" },
+                  "language": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Transcription response" },
+          "400": { "description": "Validation error" }
+        }
+      }
+    }
+  }
+}

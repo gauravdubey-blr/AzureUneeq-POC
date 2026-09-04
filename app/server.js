@@ -1,4 +1,5 @@
 const express = require("express");
+const path = require("path");
 
 // Import modular components
 const { config, validateConfig } = require("./config/config");
@@ -60,6 +61,34 @@ app.get("/", (req, res) => {
   });
 });
 
+app.get("/openapi.json", (req, res) => {
+  res.sendFile(path.join(__dirname, "openapi.json"));
+});
+
+app.get("/docs", (_req, res) => {
+  res.type("html").send(`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AzureUneeq Voice API - Swagger</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+  </head>
+  <body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+      window.ui = SwaggerUIBundle({
+        url: '/openapi.json',
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [SwaggerUIBundle.presets.apis],
+      });
+    </script>
+  </body>
+</html>`);
+});
+
 
 app.get("/health", (req, res) => {
   res.status(200).json({
@@ -96,6 +125,7 @@ async function startServer() {
       `🔧 SDK TTS available at http://localhost:${PORT}/sdk/text-to-speech`,
     );
     console.log(`❤️  Health check at http://localhost:${PORT}/health`);
+    console.log(`📘 Swagger docs at http://localhost:${PORT}/docs`);
     console.log(`🎙️  Voice input   POST http://localhost:${PORT}/api/voice/transcribe`);
     console.log(`🔊 Voice output  POST http://localhost:${PORT}/api/voice/speak`);
     console.log(`💬 Voice turn    POST http://localhost:${PORT}/api/voice/converse`);
