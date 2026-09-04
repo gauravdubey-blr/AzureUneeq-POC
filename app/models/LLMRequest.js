@@ -8,7 +8,11 @@ class LLMRequest {
     this.streaming = data.streaming !== undefined ? data.streaming : true;
     this.sessionId = data.overrideConfig?.sessionId || this.generateSessionId();
     this.timestamp = new Date().toISOString();
-    this.model = data.model || "gpt-4o";
+    this.model =
+      data.model ||
+      process.env.OGV_LLM_DEPLOYMENT ||
+      process.env.CORTEX_MODEL_DEPLOYMENT ||
+      "gpt-4.1";
     this.temperature = data.temperature !== undefined ? data.temperature : 0.7;
     this.maxTokens = data.maxTokens || 2000;
   }

@@ -18,7 +18,11 @@ class CortexRequest {
    */
   constructor(data = {}) {
     this.question = data.question || "";
-    this.modelName = data.modelName || "ibu-fahad-custom-v2-canada";
+    this.modelName =
+      data.modelName ||
+      process.env.CORTEX_MODEL_DEPLOYMENT ||
+      process.env.OGV_LLM_DEPLOYMENT ||
+      "gpt-4.1";
     this.streaming = data.streaming !== undefined ? data.streaming : false;
     this.no_summary = data.no_summary || false;
     this.workflow_timeout = data.workflow_timeout || 1800;

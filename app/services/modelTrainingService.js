@@ -8,6 +8,14 @@ const config = require("../config/config");
 const { createPerformanceLogger } = require("../utils/performanceLogger");
 
 class ModelTrainingService {
+  getDefaultModelName() {
+    return (
+      process.env.CORTEX_MODEL_DEPLOYMENT ||
+      process.env.OGV_LLM_DEPLOYMENT ||
+      "gpt-4.1"
+    );
+  }
+
   /**
    * Initialize training session
    * @param {Object} params - Training parameters
@@ -22,7 +30,7 @@ class ModelTrainingService {
 
       const payload = {
         sessionId: `training-${Date.now()}`,
-        modelName: params.modelName || "ibu-fahad-custom-v2-canada-2",
+        modelName: params.modelName || this.getDefaultModelName(),
         trainingType: params.trainingType || "fine-tune", // fine-tune, domain-adapt, reinforcement
         datasetSize: params.datasetSize || 0,
         epochCount: params.epochCount || 3,
@@ -142,7 +150,7 @@ class ModelTrainingService {
 
       const {
         sessionId,
-        modelName = "ibu-fahad-custom-v2-canada-2",
+        modelName = this.getDefaultModelName(),
         uploadId,
         epochCount = 3,
         learningRate = 0.0001,

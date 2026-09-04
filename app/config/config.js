@@ -58,6 +58,34 @@ const config = {
     scope: process.env.LLM_SCOPE || "api://llm-gateway.lilly.com/.default",
   },
 
+  // Azure model endpoint configuration (preferred over gateway/cortex legacy APIs)
+  azureModels: {
+    llm: {
+      endpoint: process.env.OGV_LLM_ENDPOINT,
+      apiKey: process.env.OGV_LLM_API_KEY,
+      deployment: process.env.OGV_LLM_DEPLOYMENT,
+      apiVersion: process.env.OGV_LLM_API_VERSION || "2024-10-21",
+    },
+    cortex: {
+      endpoint:
+        process.env.CORTEX_MODEL_ENDPOINT ||
+        process.env.OGV_GUARDRAIL_ENDPOINT ||
+        process.env.OGV_LLM_ENDPOINT,
+      apiKey:
+        process.env.CORTEX_MODEL_API_KEY ||
+        process.env.AZURE_EMBEDDING_API_KEY ||
+        process.env.OGV_LLM_API_KEY,
+      deployment:
+        process.env.CORTEX_MODEL_DEPLOYMENT ||
+        process.env.OGV_GUARDRAIL_DEPLOYMENT ||
+        process.env.OGV_LLM_DEPLOYMENT,
+      apiVersion:
+        process.env.CORTEX_MODEL_API_VERSION ||
+        process.env.OGV_LLM_API_VERSION ||
+        "2024-10-21",
+    },
+  },
+
   // Cortex API configuration
   cortex: {
     clientId: process.env.CORTEX_CLIENT_ID,
@@ -101,7 +129,33 @@ function validateConfig() {
     );
   }
 
-  // Validate LLM Gateway configuration
+  // Validate Azure LLM model configuration (preferred path)
+  const azureLlmReady =
+    !!config.azureModels.llm.endpoint &&
+    !!config.azureModels.llm.apiKey &&
+    !!config.azureModels.llm.deployment;
+  if (azureLlmReady) {
+    console.log("✓ Azure LLM model configuration detected");
+  } else {
+    console.warn(
+      "Warning: Azure LLM model config incomplete (need OGV_LLM_ENDPOINT, OGV_LLM_API_KEY, OGV_LLM_DEPLOYMENT)",
+    );
+  }
+
+  // Validate Azure Cortex model configuration (preferred path)
+  const azureCortexReady =
+    !!config.azureModels.cortex.endpoint &&
+    !!config.azureModels.cortex.apiKey &&
+    !!config.azureModels.cortex.deployment;
+  if (azureCortexReady) {
+    console.log("✓ Azure Cortex model configuration detected");
+  } else {
+    console.warn(
+      "Warning: Azure Cortex model config incomplete (need CORTEX_MODEL_* or OGV_GUARDRAIL/OGV_LLM fallbacks)",
+    );
+  }
+
+  // Validate LLM Gateway configuration (fallback path)
   const {
     apiKey,
     clientId: llmClientId,
@@ -111,10 +165,10 @@ function validateConfig() {
 
   if (!apiKey) {
     console.warn(
-      "Warning: LLM_GATEWAY_KEY not configured. LLM Gateway functionality may not work.",
+      "Warning: LLM_GATEWAY_KEY not configured. Gateway fallback may not work.",
     );
   } else {
-    console.log("✓ LLM Gateway API key configured");
+    console.log("✓ LLM Gateway fallback API key configured");
   }
 
   if (!llmClientId || !llmClientSecret || !llmTenantId) {

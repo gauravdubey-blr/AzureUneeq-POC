@@ -6,7 +6,6 @@ const cortexService = require("../services/cortexService");
 const LLMResponse = require("../models/LLMResponse");
 const CortexRequest = require("../models/CortexRequest");
 const { sanitizeResponse } = require("../utils/validators");
-// const { MOUNJARO_SYSTEM_PROMPT } = require("../constants/cortexPrompts");
 const { createPerformanceLogger } = require("../utils/performanceLogger");
 
 class CortexController {
@@ -108,6 +107,27 @@ class CortexController {
       let firstTokenTime = null;
       let eventDataLines = []; // Accumulates data: lines for current event
 
+      const emitToken = (token) => {
+        fullResponse += token;
+
+        const words = token.split(/(\s+)/);
+        for (const word of words) {
+          if (word && word.trim()) {
+            tokenCount++;
+
+            if (tokenCount === 1) {
+              firstTokenTime = Date.now();
+            }
+
+            res.write(cortexResponse.toSSE("token", word));
+
+            if (tokenCount % 10 === 0) {
+              console.log(`✅ [CortexController] Streamed ${tokenCount} tokens`);
+            }
+          }
+        }
+      };
+
       const flushEvent = () => {
         if (eventDataLines.length === 0) return;
         const payload = eventDataLines.join("\n");
@@ -119,7 +139,12 @@ class CortexController {
 
         try {
           const parsed = JSON.parse(payload);
-          return parsed;
+
+          if (parsed.choices && parsed.choices[0]?.delta?.content) {
+            emitToken(parsed.choices[0].delta.content);
+          }
+
+          return null;
         } catch (err) {
           console.warn(
             "⚠️ [CortexController] Deferred JSON parse (partial frame):",
@@ -159,30 +184,12 @@ class CortexController {
 
               // Extract message content from Cortex format
               if (parsed.type === "message" && parsed.message_fragment) {
-                const token = parsed.message_fragment;
-                fullResponse += token;
+                emitToken(parsed.message_fragment);
+              }
 
-                // Split token into smaller chunks for smoother streaming display
-                const words = token.split(/(\s+)/);
-
-                for (const word of words) {
-                  if (word && word.trim()) {
-                    tokenCount++;
-
-                    // Track time to first token
-                    if (tokenCount === 1) {
-                      firstTokenTime = Date.now();
-                    }
-
-                    res.write(cortexResponse.toSSE("token", word));
-
-                    if (tokenCount % 10 === 0) {
-                      console.log(
-                        `✅ [CortexController] Streamed ${tokenCount} tokens`
-                      );
-                    }
-                  }
-                }
+              // Azure/OpenAI-style non-SSE chunk fallback
+              if (parsed.choices && parsed.choices[0]?.delta?.content) {
+                emitToken(parsed.choices[0].delta.content);
               }
             } catch (err) {
               // Not valid JSON, might be partial - skip

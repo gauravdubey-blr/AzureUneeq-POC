@@ -275,7 +275,10 @@ router.post("/llm-query", llmController.queryLLM.bind(llmController));
  * Uses model: ibu-fahad-custom-v2-canada
  */
 router.post("/cortex", (req, res) => {
-  req.body.modelName = "ibu-fahad-custom-v2-saudi";
+  req.body.modelName =
+    process.env.CORTEX_MODEL_DEPLOYMENT ||
+    process.env.OGV_LLM_DEPLOYMENT ||
+    "gpt-4.1";
   req.body.systemPrompt = MOUNJARO_SYSTEM_PROMPT;
   return cortexController.queryCortex.call(cortexController, req, res);
 });
@@ -286,7 +289,12 @@ router.post("/cortex", (req, res) => {
  * Uses model: ibu-fahad-custom-v2-canada-2
  */
 router.post("/cortex-v2", (req, res) => {
-  req.body.modelName = "ibu-fahad-custom-v2-canada-2";
+  req.body.modelName =
+    process.env.CORTEX_MODEL_V2_DEPLOYMENT ||
+    process.env.CORTEX_MODEL_DEPLOYMENT ||
+    process.env.OGV_GUARDRAIL_DEPLOYMENT ||
+    process.env.OGV_LLM_DEPLOYMENT ||
+    "gpt-4.1";
   return cortexController.queryCortex.call(cortexController, req, res);
 });
 

@@ -291,30 +291,65 @@ class LLMGatewayService {
         console.log("🌐 Using Azure model endpoint:", url);
         console.log("📊 Deployment:", candidate.deployment);
 
-        const response = await axios.post(
-          url,
-          {
-            ...payloadExtras,
-            messages: [
-              {
-                role: "user",
-                content: prompt,
-              },
-            ],
-            temperature: 0.7,
-            max_tokens: 2000,
-            stream: streaming,
+        const requestConfig = {
+          headers: {
+            "api-key": candidate.apiKey,
+            "Content-Type": "application/json",
           },
-          {
-            headers: {
-              "api-key": candidate.apiKey,
-              "Content-Type": "application/json",
+          timeout: 30000,
+          responseType: streaming ? "stream" : "json",
+          validateStatus: () => true,
+        };
+
+        const basePayload = {
+          ...payloadExtras,
+          messages: [
+            {
+              role: "user",
+              content: prompt,
             },
-            timeout: 30000,
-            responseType: streaming ? "stream" : "json",
-            validateStatus: () => true,
-          },
-        );
+          ],
+          temperature: 0.7,
+          stream: streaming,
+        };
+
+        let response;
+        try {
+          response = await axios.post(
+            url,
+            {
+              ...basePayload,
+              max_tokens: 2000,
+            },
+            requestConfig,
+          );
+
+          const compatibilityErrorMsg =
+            response.data?.error?.message || response.data?.message || "";
+          if (
+            response.status === 400 &&
+            compatibilityErrorMsg.includes("max_tokens") &&
+            compatibilityErrorMsg.includes("max_completion_tokens")
+          ) {
+            console.warn(
+              "⚠️ Azure model requires max_completion_tokens; retrying request",
+            );
+            response = await axios.post(
+              url,
+              {
+                ...basePayload,
+                max_completion_tokens: 2000,
+              },
+              requestConfig,
+            );
+          }
+        } catch (requestError) {
+          lastError = requestError;
+          console.warn(
+            `⚠️ Azure model request failed (${requestError.message}); trying next candidate if available`,
+          );
+          continue;
+        }
 
         if (response.status < 400) {
           if (streaming) {
