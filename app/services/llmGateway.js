@@ -1,18 +1,8 @@
 const axios = require("axios");
-const { config } = require("../config/config");
 
 class LLMGatewayService {
   constructor() {
-    // Configuration from config.js
-    this.clientId = config.llmGateway.clientId;
-    this.clientSecret = config.llmGateway.clientSecret;
-    this.tenantId = config.llmGateway.tenantId;
-    this.apiKey = config.llmGateway.apiKey;
-    this.model = config.llmGateway.model;
-    this.baseURL = config.llmGateway.baseURL;
-    this.scope = config.llmGateway.scope;
-
-    // Direct Azure model configuration.
+    // Azure model configuration only.
     this.azureEndpoint = process.env.OGV_LLM_ENDPOINT;
     this.azureApiKey = process.env.OGV_LLM_API_KEY;
     this.azureDeployment = process.env.OGV_LLM_DEPLOYMENT;
@@ -23,9 +13,6 @@ class LLMGatewayService {
       process.env.OGV_GUARDRAIL_ENDPOINT || process.env.AZURE_EMBEDDING_ENDPOINT;
     this.azureFallbackApiKey = process.env.AZURE_EMBEDDING_API_KEY;
     this.azureFallbackDeployment = process.env.OGV_GUARDRAIL_DEPLOYMENT;
-
-    // Build token URL dynamically
-    this.tokenUrl = `https://login.microsoftonline.com/${this.tenantId}/oauth2/v2.0/token`;
 
     // TLS verification is NOT disabled automatically any more.
     //
@@ -46,14 +33,6 @@ class LLMGatewayService {
     }
   }
 
-  hasAadCredentials() {
-    return Boolean(this.clientId && this.clientSecret && this.tenantId);
-  }
-
-  hasGatewayKey() {
-    return Boolean(this.apiKey);
-  }
-
   hasAzureModelConfig() {
     return Boolean(this.azureEndpoint && this.azureApiKey && this.azureDeployment);
   }
@@ -64,10 +43,6 @@ class LLMGatewayService {
         this.azureFallbackApiKey &&
         (this.azureDeployment || this.azureFallbackDeployment),
     );
-  }
-
-  normalizedAzureEndpoint() {
-    return String(this.azureEndpoint || "").replace(/\/+$/, "");
   }
 
   normalizedEndpoint(endpoint) {
@@ -101,51 +76,7 @@ class LLMGatewayService {
     };
   }
 
-  // Function to get access token from Microsoft
-  async getAccessToken() {
-    if (!this.hasAadCredentials()) {
-      throw new Error(
-        "LLM Gateway AAD credentials are not configured (LLM_CLIENT_ID, LLM_CLIENT_SECRET, LLM_TENANT_ID)",
-      );
-    }
-
-    const tokenPayload = new URLSearchParams({
-      grant_type: "client_credentials",
-      client_id: this.clientId,
-      client_secret: this.clientSecret,
-      scope: this.scope,
-    });
-
-    try {
-      console.log("🔑 Requesting access token from Microsoft...");
-      console.log("   Token URL:", this.tokenUrl);
-      console.log(
-        "   Client ID:",
-        this.clientId ? `***${this.clientId.slice(-8)}` : "NOT SET"
-      );
-
-      const tokenResponse = await axios.post(this.tokenUrl, tokenPayload, {
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-      });
-
-      console.log("✅ Access token received successfully");
-      return tokenResponse.data.access_token;
-    } catch (error) {
-      console.error("❌ Error getting access token:");
-      console.error("   Status:", error.response?.status);
-      console.error("   Data:", error.response?.data);
-      console.error("   Message:", error.message);
-      throw new Error(
-        `Token request failed: ${
-          error.response?.data?.error_description || error.message
-        }`
-      );
-    }
-  }
-
-  // Main function to query the LLM
+  // Main function to query the LLM via Azure Models only
   async queryLLM(prompt = "What is the capital of France?", streaming = true) {
     try {
       console.log(
@@ -154,87 +85,13 @@ class LLMGatewayService {
       );
       console.log("📡 Streaming enabled:", streaming);
 
-      if (this.hasAzureModelConfig()) {
-        return await this.queryAzureModel(prompt, streaming);
-      }
-
-      if (!this.hasGatewayKey() && !this.hasAadCredentials()) {
+      if (!this.hasAzureModelConfig() && !this.hasAzureFallbackConfig()) {
         throw new Error(
-          "LLM is not configured. Provide Azure model settings (OGV_LLM_ENDPOINT, OGV_LLM_API_KEY, OGV_LLM_DEPLOYMENT) or gateway settings.",
+          "Azure Models not configured. Set OGV_LLM_ENDPOINT, OGV_LLM_API_KEY, OGV_LLM_DEPLOYMENT (or OGV_GUARDRAIL_ENDPOINT + AZURE_EMBEDDING_API_KEY + OGV_GUARDRAIL_DEPLOYMENT).",
         );
       }
 
-      let accessToken = null;
-      if (this.hasAadCredentials()) {
-        accessToken = await this.getAccessToken();
-      } else {
-        console.warn(
-          "⚠️  LLM AAD credentials missing; attempting API key-only gateway request",
-        );
-      }
-
-      console.log("🌐 Making request to:", this.baseURL + "chat/completions");
-      console.log("📊 Model:", this.model);
-
-      const headers = {
-        "Content-Type": "application/json",
-      };
-      if (accessToken) {
-        headers.Authorization = `Bearer ${accessToken}`;
-      }
-      if (this.apiKey) {
-        headers["X-LLM-Gateway-Key"] = this.apiKey;
-      }
-
-      // Query the model using direct API call
-      const response = await axios.post(
-        `${this.baseURL}chat/completions`,
-        {
-          model: this.model,
-          messages: [
-            {
-              role: "user",
-              content: prompt,
-            },
-          ],
-          temperature: 0.7,
-          max_tokens: 2000,
-          stream: streaming,
-        },
-        {
-          headers,
-          timeout: 30000, // 30 second timeout
-          responseType: streaming ? "stream" : "json",
-          validateStatus: () => true, // Don't throw on any status
-        }
-      );
-
-      if (response.status >= 400) {
-        const errorMsg =
-          response.data?.error?.message ||
-          response.data?.message ||
-          `LLM Gateway returned status ${response.status}`;
-        throw new Error(errorMsg);
-      }
-
-      console.log("✅ LLM Response received successfully");
-
-      // For streaming, return the stream object directly
-      if (streaming) {
-        return {
-          stream: response.data,
-          model: this.model,
-          streaming: true,
-        };
-      }
-
-      // Return in OpenAI format for consistency (non-streaming)
-      return {
-        choices: response.data.choices,
-        model: response.data.model,
-        usage: response.data.usage,
-        streaming: false,
-      };
+      return await this.queryAzureModel(prompt, streaming);
     } catch (error) {
       console.error("❌ Error querying LLM:");
       console.error("   Status:", error.response?.status);
@@ -397,7 +254,11 @@ if (require.main === module) {
   service
     .queryLLM()
     .then((response) => {
-      console.log("\nResponse:", response.choices[0].message.content);
+      if (response.streaming) {
+        console.log("\nStreaming response opened");
+      } else {
+        console.log("\nResponse:", response.choices[0].message.content);
+      }
     })
     .catch((error) => {
       console.error("Error:", error.message);

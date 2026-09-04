@@ -1,15 +1,9 @@
 const axios = require("axios");
-const msal = require("@azure/msal-node");
-const { config } = require("../config/config");
 const { createPerformanceLogger } = require("../utils/performanceLogger");
 
 class CortexService {
   constructor() {
-    this.baseURL = config.cortex.baseURL;
-    this.tokenCache = null;
-    this.tokenExpiry = null;
-
-    // Azure model endpoint configuration for Cortex flows.
+    // Azure model endpoint configuration for Cortex flows only.
     this.azureEndpoint =
       process.env.CORTEX_MODEL_ENDPOINT ||
       process.env.OGV_GUARDRAIL_ENDPOINT ||
@@ -216,75 +210,14 @@ class CortexService {
     throw lastError || new Error("Azure model request failed");
   }
 
-  // Get access token for Cortex API
-  async getAccessToken() {
-    try {
-      // Return cached token if still valid
-      if (
-        this.tokenCache &&
-        this.tokenExpiry &&
-        Date.now() < this.tokenExpiry
-      ) {
-        return this.tokenCache;
-      }
-
-      const { clientId, clientSecret, tenantId, scope, tokenUrl } =
-        config.cortex;
-
-      // If no credentials configured, return null (will fail gracefully)
-      if (!clientId || !clientSecret || !tenantId) {
-        console.warn(
-          "⚠️ [Cortex] No Azure credentials configured. Set CORTEX_CLIENT_ID, CORTEX_CLIENT_SECRET, CORTEX_TENANT_ID in .env"
-        );
-        return null;
-      }
-
-      const msalConfig = {
-        auth: {
-          clientId: clientId,
-          authority: `https://login.microsoftonline.com/${tenantId}`,
-          clientSecret: clientSecret,
-        },
-      };
-
-      const cca = new msal.ConfidentialClientApplication(msalConfig);
-      const tokenRequest = {
-        scopes: [scope],
-      };
-
-      const response = await cca.acquireTokenByClientCredential(tokenRequest);
-
-      if (!response || !response.accessToken) {
-        throw new Error("Failed to acquire access token");
-      }
-
-      // Cache token with 5 minute buffer before expiry
-      this.tokenCache = response.accessToken;
-      this.tokenExpiry =
-        Date.now() +
-        (response.expiresOn?.getTime() - Date.now() || 3600000) -
-        300000;
-
-      return response.accessToken;
-    } catch (error) {
-      console.error(
-        "Error acquiring Cortex access token:",
-        error.errorCode || error.message
-      );
-      return null;
-    }
-  }
-
-  // Main function to query Cortex model
+  // Main function to query Cortex route model via Azure Models only
   async askModel(modelName, question, options = {}) {
     const logger = createPerformanceLogger("Cortex API");
 
     try {
       const {
         stream = false,
-        no_summary = false,
         workflow_timeout = 1800,
-        background_job = false,
         systemPrompt = null,
       } = options;
 
@@ -301,73 +234,18 @@ class CortexService {
       console.log("   Workflow timeout:", workflow_timeout, "seconds");
       console.log("   System prompt:", systemPrompt ? "ENABLED" : "disabled");
 
-      if (this.hasAzureModelConfig()) {
-        return await this.askAzureModel(modelName, question, options);
+      if (!this.hasAzureModelConfig()) {
+        throw new Error(
+          "Azure Cortex model config missing. Set CORTEX_MODEL_ENDPOINT, CORTEX_MODEL_API_KEY, CORTEX_MODEL_DEPLOYMENT (or OGV_* fallbacks).",
+        );
       }
 
-      const accessToken = await this.getAccessToken();
-      console.log("🔑 [Cortex] Access token acquired");
-      const url = `${this.baseURL}/ask/${modelName}`;
-      console.log("🌐 [Cortex] Making request to:", url);
-
-      // Calculate HTTP timeout based on workflow timeout
-      const httpTimeout = Math.max(workflow_timeout * 1000 + 30000, 300000);
-      console.log(
-        `⏱️  [Cortex] HTTP timeout: ${httpTimeout}ms (${(
-          httpTimeout / 1000
-        ).toFixed(1)}s)`
-      );
-
-      // Construct the question with system prompt if provided
-      const fullQuestion = systemPrompt
-        ? `${systemPrompt}\n\nUser Question: ${question}`
-        : question;
-
-      // Query the model using GET request with query params
-      const response = await axios.get(url, {
-        params: {
-          q: fullQuestion,
-          stream: stream,
-          no_summary: no_summary,
-          workflow_timeout: workflow_timeout,
-          background_job: background_job,
-        },
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          Accept: "application/json",
-        },
-        timeout: httpTimeout,
-        responseType: stream ? "stream" : "json",
-        validateStatus: () => true, // Don't throw on any status
-      });
-
-      console.log("✅ [Cortex] Response received successfully");
-
-      // For streaming, return the stream object directly
-      if (stream) {
-        logger.end({
-          statusCode: response.status,
-          streaming: true,
-        });
-
-        return {
-          stream: response.data,
-          model: modelName,
-          streaming: true,
-        };
-      }
-
+      const result = await this.askAzureModel(modelName, question, options);
       logger.end({
-        statusCode: response.status,
-        streaming: false,
+        streaming: stream,
+        statusCode: 200,
       });
-
-      // Return response data for non-streaming
-      return {
-        data: response.data,
-        model: modelName,
-        streaming: false,
-      };
+      return result;
     } catch (error) {
       logger.error(error);
       console.error("❌ [Cortex] Error querying model:");

@@ -44,21 +44,7 @@ const config = {
     },
   },
 
-  // LLM Gateway configuration
-  llmGateway: {
-    clientId: process.env.LLM_CLIENT_ID,
-    clientSecret: process.env.LLM_CLIENT_SECRET,
-    tenantId: process.env.LLM_TENANT_ID,
-    apiKey: process.env.LLM_GATEWAY_KEY,
-    model: process.env.LLM_MODEL || "gpt-4o",
-    baseURL:
-      process.env.LLM_GATEWAY_BASE_URL ||
-      "https://gateway.apim-dev.lilly.com/llm-gateway/",
-    tokenUrl: process.env.LLM_TOKEN_URL,
-    scope: process.env.LLM_SCOPE || "api://llm-gateway.lilly.com/.default",
-  },
-
-  // Azure model endpoint configuration (preferred over gateway/cortex legacy APIs)
+  // Azure model endpoint configuration (only model runtime path)
   azureModels: {
     llm: {
       endpoint: process.env.OGV_LLM_ENDPOINT,
@@ -86,15 +72,6 @@ const config = {
     },
   },
 
-  // Cortex API configuration
-  cortex: {
-    clientId: process.env.CORTEX_CLIENT_ID,
-    clientSecret: process.env.CORTEX_CLIENT_SECRET,
-    tenantId: process.env.CORTEX_TENANT_ID,
-    baseURL: process.env.CORTEX_BASE_URL || "https://gateway.apim.lilly.com/cortex/model",
-    scope: process.env.CORTEX_SCOPE || "api://cortex.lilly.com/.default",
-    tokenUrl: process.env.CORTEX_TOKEN_URL,
-  },
 };
 
 /**
@@ -155,29 +132,7 @@ function validateConfig() {
     );
   }
 
-  // Validate LLM Gateway configuration (fallback path)
-  const {
-    apiKey,
-    clientId: llmClientId,
-    clientSecret: llmClientSecret,
-    tenantId: llmTenantId,
-  } = config.llmGateway;
-
-  if (!apiKey) {
-    console.warn(
-      "Warning: LLM_GATEWAY_KEY not configured. Gateway fallback may not work.",
-    );
-  } else {
-    console.log("✓ LLM Gateway fallback API key configured");
-  }
-
-  if (!llmClientId || !llmClientSecret || !llmTenantId) {
-    console.warn(
-      "Warning: Missing LLM Gateway Azure credentials (LLM_CLIENT_ID, LLM_CLIENT_SECRET, LLM_TENANT_ID).",
-    );
-  } else {
-    console.log("✓ LLM Gateway Azure credentials configured");
-  }
+  console.log("✓ Model routing configured for Azure Models only");
 
   console.log("✓ Configuration validated successfully");
 }
