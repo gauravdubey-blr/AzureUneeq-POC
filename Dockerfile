@@ -19,6 +19,7 @@ COPY --from=builder /app/node_modules ./node_modules
 
 # Copy application files
 COPY app/server.js .
+COPY app/openapi.json .
 COPY app/config ./config
 COPY app/controllers ./controllers
 COPY app/middleware ./middleware
