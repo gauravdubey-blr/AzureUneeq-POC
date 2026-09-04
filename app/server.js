@@ -1,5 +1,4 @@
 const express = require("express");
-const path = require("path");
 
 // Import modular components
 const { config, validateConfig } = require("./config/config");
@@ -38,27 +37,27 @@ async function initializeApp() {
 // Middleware
 app.use(express.json());
 app.use(requestLogger); // Log all requests
-app.use(express.static("public"));
 
 // Routes
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
-app.get("/llm", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "llm-gateway.html"));
-});
-
-app.get("/cortex", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "cortex.html"));
-});
-
-app.get("/cortex-rag", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "cortex-rag.html"));
-});
-
-app.get("/sdk-test", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "sdk-test.html"));
+  res.status(200).json({
+    name: "AzureUneeq Voice API",
+    status: "ok",
+    endpoints: {
+      health: "/health",
+      apiHealth: "/api/health",
+      voiceConfig: "/api/voice/config",
+      voiceTranscribe: "/api/voice/transcribe",
+      voiceSpeak: "/api/voice/speak",
+      voiceConverse: "/api/voice/converse",
+      textToSpeech: "/api/text-to-speech",
+      speechToText: "/api/speech-to-text",
+      llmQuery: "/api/llm-query",
+      cortex: "/api/cortex",
+      sdkTextToSpeech: "/sdk/text-to-speech",
+    },
+    timestamp: new Date().toISOString(),
+  });
 });
 
 
@@ -90,14 +89,12 @@ async function startServer() {
 
   app.listen(PORT, () => {
     console.log(`🚀 Server is running on http://localhost:${PORT}`);
-    console.log(`📱 Visit http://localhost:${PORT} to view the application`);
     console.log(
       `🎤 TTS API available at http://localhost:${PORT}/api/text-to-speech`,
     );
     console.log(
       `🔧 SDK TTS available at http://localhost:${PORT}/sdk/text-to-speech`,
     );
-    console.log(`🧪 SDK Test Page at http://localhost:${PORT}/sdk-test`);
     console.log(`❤️  Health check at http://localhost:${PORT}/health`);
     console.log(`🎙️  Voice input   POST http://localhost:${PORT}/api/voice/transcribe`);
     console.log(`🔊 Voice output  POST http://localhost:${PORT}/api/voice/speak`);
