@@ -12,6 +12,18 @@ class LLMGatewayService {
     this.baseURL = config.llmGateway.baseURL;
     this.scope = config.llmGateway.scope;
 
+    // Direct Azure model configuration.
+    this.azureEndpoint = process.env.OGV_LLM_ENDPOINT;
+    this.azureApiKey = process.env.OGV_LLM_API_KEY;
+    this.azureDeployment = process.env.OGV_LLM_DEPLOYMENT;
+    this.azureApiVersion = process.env.OGV_LLM_API_VERSION || "2024-10-21";
+
+    // Secondary Azure model configuration (fallbacks).
+    this.azureFallbackEndpoint =
+      process.env.OGV_GUARDRAIL_ENDPOINT || process.env.AZURE_EMBEDDING_ENDPOINT;
+    this.azureFallbackApiKey = process.env.AZURE_EMBEDDING_API_KEY;
+    this.azureFallbackDeployment = process.env.OGV_GUARDRAIL_DEPLOYMENT;
+
     // Build token URL dynamically
     this.tokenUrl = `https://login.microsoftonline.com/${this.tenantId}/oauth2/v2.0/token`;
 
@@ -34,8 +46,69 @@ class LLMGatewayService {
     }
   }
 
+  hasAadCredentials() {
+    return Boolean(this.clientId && this.clientSecret && this.tenantId);
+  }
+
+  hasGatewayKey() {
+    return Boolean(this.apiKey);
+  }
+
+  hasAzureModelConfig() {
+    return Boolean(this.azureEndpoint && this.azureApiKey && this.azureDeployment);
+  }
+
+  hasAzureFallbackConfig() {
+    return Boolean(
+      this.azureFallbackEndpoint &&
+        this.azureFallbackApiKey &&
+        (this.azureDeployment || this.azureFallbackDeployment),
+    );
+  }
+
+  normalizedAzureEndpoint() {
+    return String(this.azureEndpoint || "").replace(/\/+$/, "");
+  }
+
+  normalizedEndpoint(endpoint) {
+    return String(endpoint || "").replace(/\/+$/, "");
+  }
+
+  isModelsEndpoint(endpoint) {
+    const normalized = this.normalizedEndpoint(endpoint).toLowerCase();
+    return normalized.includes(".services.ai.azure.com") || normalized.includes("/models");
+  }
+
+  buildAzureUrl(endpoint, deployment, apiVersion) {
+    const normalized = this.normalizedEndpoint(endpoint);
+    const version = encodeURIComponent(apiVersion);
+
+    if (this.isModelsEndpoint(normalized)) {
+      const base = normalized.replace(/\/models$/i, "");
+      return {
+        url: `${base}/models/chat/completions?api-version=${version}`,
+        payloadExtras: {
+          model: deployment,
+        },
+      };
+    }
+
+    return {
+      url:
+        `${normalized}/openai/deployments/${encodeURIComponent(deployment)}` +
+        `/chat/completions?api-version=${version}`,
+      payloadExtras: {},
+    };
+  }
+
   // Function to get access token from Microsoft
   async getAccessToken() {
+    if (!this.hasAadCredentials()) {
+      throw new Error(
+        "LLM Gateway AAD credentials are not configured (LLM_CLIENT_ID, LLM_CLIENT_SECRET, LLM_TENANT_ID)",
+      );
+    }
+
     const tokenPayload = new URLSearchParams({
       grant_type: "client_credentials",
       client_id: this.clientId,
@@ -81,10 +154,37 @@ class LLMGatewayService {
       );
       console.log("📡 Streaming enabled:", streaming);
 
-      const accessToken = await this.getAccessToken();
+      if (this.hasAzureModelConfig()) {
+        return await this.queryAzureModel(prompt, streaming);
+      }
+
+      if (!this.hasGatewayKey() && !this.hasAadCredentials()) {
+        throw new Error(
+          "LLM is not configured. Provide Azure model settings (OGV_LLM_ENDPOINT, OGV_LLM_API_KEY, OGV_LLM_DEPLOYMENT) or gateway settings.",
+        );
+      }
+
+      let accessToken = null;
+      if (this.hasAadCredentials()) {
+        accessToken = await this.getAccessToken();
+      } else {
+        console.warn(
+          "⚠️  LLM AAD credentials missing; attempting API key-only gateway request",
+        );
+      }
 
       console.log("🌐 Making request to:", this.baseURL + "chat/completions");
       console.log("📊 Model:", this.model);
+
+      const headers = {
+        "Content-Type": "application/json",
+      };
+      if (accessToken) {
+        headers.Authorization = `Bearer ${accessToken}`;
+      }
+      if (this.apiKey) {
+        headers["X-LLM-Gateway-Key"] = this.apiKey;
+      }
 
       // Query the model using direct API call
       const response = await axios.post(
@@ -102,16 +202,20 @@ class LLMGatewayService {
           stream: streaming,
         },
         {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "X-LLM-Gateway-Key": this.apiKey,
-            "Content-Type": "application/json",
-          },
+          headers,
           timeout: 30000, // 30 second timeout
           responseType: streaming ? "stream" : "json",
           validateStatus: () => true, // Don't throw on any status
         }
       );
+
+      if (response.status >= 400) {
+        const errorMsg =
+          response.data?.error?.message ||
+          response.data?.message ||
+          `LLM Gateway returned status ${response.status}`;
+        throw new Error(errorMsg);
+      }
 
       console.log("✅ LLM Response received successfully");
 
@@ -144,6 +248,109 @@ class LLMGatewayService {
         error.message;
       throw new Error(`LLM Query Failed: ${errorMsg}`);
     }
+  }
+
+  async queryAzureModel(prompt, streaming) {
+    const candidates = [];
+
+    if (this.hasAzureModelConfig()) {
+      candidates.push({
+        endpoint: this.azureEndpoint,
+        apiKey: this.azureApiKey,
+        deployment: this.azureDeployment,
+        apiVersion: this.azureApiVersion,
+      });
+    }
+
+    if (this.hasAzureFallbackConfig()) {
+      candidates.push({
+        endpoint: this.azureFallbackEndpoint,
+        apiKey: this.azureFallbackApiKey,
+        deployment: this.azureDeployment || this.azureFallbackDeployment,
+        apiVersion: this.azureApiVersion,
+      });
+    }
+
+    let lastError = null;
+
+    for (const candidate of candidates) {
+      const versions = [candidate.apiVersion];
+      if (this.isModelsEndpoint(candidate.endpoint)) {
+        versions.push("2024-05-01-preview");
+      }
+
+      const uniqueVersions = [...new Set(versions.filter(Boolean))];
+
+      for (const apiVersion of uniqueVersions) {
+        const { url, payloadExtras } = this.buildAzureUrl(
+          candidate.endpoint,
+          candidate.deployment,
+          apiVersion,
+        );
+
+        console.log("🌐 Using Azure model endpoint:", url);
+        console.log("📊 Deployment:", candidate.deployment);
+
+        const response = await axios.post(
+          url,
+          {
+            ...payloadExtras,
+            messages: [
+              {
+                role: "user",
+                content: prompt,
+              },
+            ],
+            temperature: 0.7,
+            max_tokens: 2000,
+            stream: streaming,
+          },
+          {
+            headers: {
+              "api-key": candidate.apiKey,
+              "Content-Type": "application/json",
+            },
+            timeout: 30000,
+            responseType: streaming ? "stream" : "json",
+            validateStatus: () => true,
+          },
+        );
+
+        if (response.status < 400) {
+          if (streaming) {
+            return {
+              stream: response.data,
+              model: candidate.deployment,
+              streaming: true,
+            };
+          }
+
+          return {
+            choices: response.data.choices,
+            model: response.data.model || candidate.deployment,
+            usage: response.data.usage,
+            streaming: false,
+          };
+        }
+
+        const errorMsg =
+          response.data?.error?.message ||
+          response.data?.message ||
+          `Azure model returned status ${response.status}`;
+
+        lastError = new Error(errorMsg);
+
+        if (![401, 403, 404].includes(response.status)) {
+          throw lastError;
+        }
+
+        console.warn(
+          `⚠️ Azure model candidate failed with status ${response.status}; trying next candidate if available`,
+        );
+      }
+    }
+
+    throw lastError || new Error("Azure model request failed");
   }
 }
 
